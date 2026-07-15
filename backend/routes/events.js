@@ -197,6 +197,13 @@ router.get("/:id", catchAsync(async (req, res) => {
     }
 
     const event = rows[0];
+
+    // Track view (fire and forget)
+    const userId = req.session.user ? req.session.user.id : null;
+    pool.query(
+      "INSERT INTO event_view (event_id, user_id) VALUES ($1, $2)",
+      [eventId, userId]
+    ).catch(() => {});
     const { rows: tagRows } = await pool.query(
       `SELECT t.id, t.name
        FROM event_tag et

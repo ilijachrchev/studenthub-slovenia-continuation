@@ -48,17 +48,10 @@ describe("Migration lifecycle", () => {
     client = new Client(ROOT_CONFIG);
     await client.connect();
 
-    // Terminate existing connections before dropping
-    await client.query(`
-      SELECT pg_terminate_backend(pid)
-      FROM pg_stat_activity
-      WHERE datname = $1 AND pid <> pg_backend_pid()
-    `, [TEST_DB]);
-
-    await client.query(`DROP DATABASE IF EXISTS ${TEST_DB}`);
+    await client.query(`DROP DATABASE IF EXISTS ${TEST_DB} WITH (FORCE)`);
     await client.query(`CREATE DATABASE ${TEST_DB}`);
 
-    // Initialize Knex with test database
+    // Initialize Knex with test database and aggressive pool timeouts
     knex = Knex({
       client: "pg",
       connection: {
@@ -68,6 +61,12 @@ describe("Migration lifecycle", () => {
         password: ROOT_CONFIG.password,
         database: TEST_DB,
       },
+      pool: {
+        min: 0,
+        max: 1,
+        idleTimeoutMillis: 5000,
+        acquireTimeoutMillis: 5000,
+      },
       migrations: {
         directory: "./db/migrations",
       },
@@ -75,14 +74,23 @@ describe("Migration lifecycle", () => {
   });
 
   afterAll(async () => {
-    if (knex) await knex.destroy();
+    // Terminate Knex connections first so knex.destroy() resolves quickly
+    if (client && knex) {
+      try {
+        await client.query(`
+          SELECT pg_terminate_backend(pid)
+          FROM pg_stat_activity
+          WHERE datname = $1 AND pid <> pg_backend_pid()
+        `, [TEST_DB]);
+      } catch (_) { /* ignore — DB may already be gone */ }
+    }
+    if (knex) {
+      await knex.destroy().catch(() => {});
+    }
     if (client) {
-      await client.query(`
-        SELECT pg_terminate_backend(pid)
-        FROM pg_stat_activity
-        WHERE datname = $1 AND pid <> pg_backend_pid()
-      `, [TEST_DB]);
-      await client.query(`DROP DATABASE IF EXISTS ${TEST_DB}`);
+      try {
+        await client.query(`DROP DATABASE IF EXISTS ${TEST_DB} WITH (FORCE)`);
+      } catch (_) { /* ignore */ }
       await client.end();
     }
   });

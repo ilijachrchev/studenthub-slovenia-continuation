@@ -13,13 +13,6 @@ module.exports = async function globalTeardown() {
   const client = new Client(ROOT_CONFIG);
   await client.connect();
 
-  // Terminate connections before dropping
-  await client.query(`
-    SELECT pg_terminate_backend(pid)
-    FROM pg_stat_activity
-    WHERE datname = $1 AND pid <> pg_backend_pid()
-  `, [TEST_DB]);
-
-  await client.query(`DROP DATABASE IF EXISTS ${TEST_DB}`);
+  await client.query(`DROP DATABASE IF EXISTS ${TEST_DB} WITH (FORCE)`);
   await client.end();
 };

@@ -174,9 +174,17 @@ router.put("/:id", requireAuth, requireRole("organizer"), catchAsync(async (req,
     const { description, logo, website, contact_email,
             facebook, instagram, linkedin, twitter } = req.body;
 
-    const validationErrors = validateOrganization(req.body);
-    if (validationErrors.length > 0) {
-        return res.status(400).json({ error: validationErrors[0] });
+    // Validate only fields that are being updated
+    if (contact_email !== undefined && contact_email !== null) {
+        if (!contact_email || !contact_email.trim()) {
+            return res.status(400).json({ error: "Contact email cannot be empty" });
+        }
+    }
+    if (description !== undefined && description !== null && description.length > 5000) {
+        return res.status(400).json({ error: "Description must be 5000 characters or fewer" });
+    }
+    if (website !== undefined && website !== null && website.length > 500) {
+        return res.status(400).json({ error: "Website must be 500 characters or fewer" });
     }
 
     const { rowCount } = await pool.query(

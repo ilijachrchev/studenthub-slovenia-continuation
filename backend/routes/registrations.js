@@ -3,6 +3,7 @@ const pool = require("../db");
 const crypto = require("crypto");
 const catchAsync = require("../middleware/catchAsync");
 const { requireAuth } = require("../middleware/auth");
+const notificationService = require("../services/notification");
 
 const router = express.Router();
 
@@ -81,6 +82,36 @@ router.post("/:id", requireAuth, catchAsync(async (req, res) => {
        RETURNING id, user_id, event_id, registered_at, ticket_code, checked_in`,
       [userId, eventId, ticketCode]
     );
+
+    // Notify the event organizer
+    const { rows: eventInfo } = await pool.query(
+      `SELECT e.title, e.organization_id
+       FROM event e WHERE e.id = $1`,
+      [eventId]
+    );
+    if (eventInfo.length) {
+      const { rows: owners } = await pool.query(
+        `SELECT op.user_id FROM organizer_profile op
+         WHERE op.organization_id = $1 AND op.role_in_org = 'owner'`,
+        [eventInfo[0].organization_id]
+      );
+      const { rows: student } = await pool.query(
+        'SELECT first_name, last_name FROM "user" WHERE id = $1',
+        [userId]
+      );
+      const studentName = student.length
+        ? `${student[0].first_name} ${student[0].last_name}`
+        : "A student";
+      for (const owner of owners) {
+        await notificationService.create({
+          userId: owner.user_id,
+          type: notificationService.NOTIFICATION_TYPES.REGISTRATION,
+          title: "New registration",
+          message: `${studentName} registered for "${eventInfo[0].title}"`,
+          relatedId: parseInt(eventId, 10),
+        });
+      }
+    }
 
     res.status(201).json(registration);
 }));

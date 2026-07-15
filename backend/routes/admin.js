@@ -3,6 +3,7 @@ const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
 const logger = require("../middleware/logger");
 const { requireRole } = require("../middleware/auth");
+const notificationService = require("../services/notification");
 
 const router = express.Router();
 
@@ -34,6 +35,28 @@ router.post("/events/:id/approve", requireAdmin, catchAsync(async (req, res) => 
 
     if (rowCount === 0) {
         return res.status(400).json({ error: "Event not found or not awaiting approval" });
+    }
+
+    // Notify the event organizer
+    const { rows: eventInfo } = await pool.query(
+        `SELECT e.title, e.organization_id FROM event e WHERE e.id = $1`,
+        [req.params.id]
+    );
+    if (eventInfo.length) {
+        const { rows: owners } = await pool.query(
+            `SELECT user_id FROM organizer_profile
+             WHERE organization_id = $1 AND role_in_org = 'owner'`,
+            [eventInfo[0].organization_id]
+        );
+        for (const owner of owners) {
+            await notificationService.create({
+                userId: owner.user_id,
+                type: notificationService.NOTIFICATION_TYPES.EVENT_APPROVED,
+                title: "Event approved",
+                message: `Your event "${eventInfo[0].title}" has been approved and is now published`,
+                relatedId: parseInt(req.params.id, 10),
+            });
+        }
     }
 
     res.json({ message: "Event published" });
@@ -77,6 +100,29 @@ router.post("/events/:id/reject", requireAdmin, catchAsync(async (req, res) => {
         );
 
         await client.query("COMMIT");
+
+        // Notify the event organizer
+        const { rows: eventInfo } = await pool.query(
+            `SELECT e.title, e.organization_id FROM event e WHERE e.id = $1`,
+            [req.params.id]
+        );
+        if (eventInfo.length) {
+            const { rows: owners } = await pool.query(
+                `SELECT user_id FROM organizer_profile
+                 WHERE organization_id = $1 AND role_in_org = 'owner'`,
+                [eventInfo[0].organization_id]
+            );
+            for (const owner of owners) {
+                await notificationService.create({
+                    userId: owner.user_id,
+                    type: notificationService.NOTIFICATION_TYPES.EVENT_REJECTED,
+                    title: "Event rejected",
+                    message: `Your event "${eventInfo[0].title}" was rejected: ${reason.trim()}`,
+                    relatedId: parseInt(req.params.id, 10),
+                });
+            }
+        }
+
         res.json({ message: "Event rejected" });
     } catch (error) {
         await client.query("ROLLBACK");
@@ -116,6 +162,23 @@ router.post("/organizations/:id/approve", requireAdmin, catchAsync(async (req, r
         return res.status(400).json({ error: "Organization not found or not awaiting approval" });
     }
 
+    // Notify the organization owner
+    const { rows: owners } = await pool.query(
+        `SELECT op.user_id, o.name FROM organizer_profile op
+         JOIN organization o ON o.id = op.organization_id
+         WHERE op.organization_id = $1 AND op.role_in_org = 'owner'`,
+        [req.params.id]
+    );
+    for (const owner of owners) {
+        await notificationService.create({
+            userId: owner.user_id,
+            type: notificationService.NOTIFICATION_TYPES.EVENT_APPROVED,
+            title: "Organization approved",
+            message: `Your organization "${owner.name}" has been approved`,
+            relatedId: parseInt(req.params.id, 10),
+        });
+    }
+
     res.json({ message: "Organization approved" });
 }));
 
@@ -129,6 +192,23 @@ router.post("/organizations/:id/reject", requireAdmin, catchAsync(async (req, re
 
     if (rowCount === 0) {
         return res.status(400).json({ error: "Organization not found or not awaiting approval" });
+    }
+
+    // Notify the organization owner
+    const { rows: owners } = await pool.query(
+        `SELECT op.user_id, o.name FROM organizer_profile op
+         JOIN organization o ON o.id = op.organization_id
+         WHERE op.organization_id = $1 AND op.role_in_org = 'owner'`,
+        [req.params.id]
+    );
+    for (const owner of owners) {
+        await notificationService.create({
+            userId: owner.user_id,
+            type: notificationService.NOTIFICATION_TYPES.EVENT_REJECTED,
+            title: "Organization rejected",
+            message: `Your organization "${owner.name}" application was not approved`,
+            relatedId: parseInt(req.params.id, 10),
+        });
     }
 
     res.json({ message: "Organization rejected" });

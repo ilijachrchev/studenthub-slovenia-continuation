@@ -16,6 +16,7 @@ const adminRoutes = require("./routes/admin");
 const bookmarksRoutes = require("./routes/bookmarks");
 const feedbackRoutes = require("./routes/feedback");
 const searchRoutes = require("./routes/search");
+const notificationRoutes = require("./routes/notifications");
 const { validateOrigin } = require("./middleware/csrf");
 const logger = require("./middleware/logger");
 const pinoHttp = require("pino-http");
@@ -94,6 +95,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/bookmarks", bookmarksRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/search", searchRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 const reactBuildPath = path.join(__dirname, './dist');
 if (fs.existsSync(reactBuildPath)) {

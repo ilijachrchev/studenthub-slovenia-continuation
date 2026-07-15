@@ -4,6 +4,7 @@ const { validateEvent } = require("../middleware/validate");
 const catchAsync = require("../middleware/catchAsync");
 const logger = require("../middleware/logger");
 const { requireRole } = require("../middleware/auth");
+const notificationService = require("../services/notification");
 
 const router = express.Router();
 
@@ -141,6 +142,47 @@ router.post("/events/:id/submit", requireOrganizer, catchAsync(async (req, res) 
     await pool.query("UPDATE event SET status = 'submitted' WHERE id = $1", [eventId]);
 
     res.json({message: "Event submitted for approval"});
+}));
+
+// POST /api/organizer/events/:id/cancel — cancel own event
+router.post("/events/:id/cancel", requireOrganizer, catchAsync(async (req, res) => {
+    const eventId = req.params.id;
+
+    const { rows } = await pool.query(
+        `SELECT e.id, e.status, e.title FROM event e
+        JOIN organizer_profile op ON op.organization_id = e.organization_id
+        WHERE e.id = $1 AND op.user_id = $2`,
+        [eventId, req.session.user.id]
+    );
+    if (rows.length === 0) {
+        return res.status(404).json({ error: "Event not found" });
+    }
+
+    const event = rows[0];
+    if (!["draft", "submitted", "published"].includes(event.status)) {
+        return res.status(400).json({ error: `Cannot cancel event with status "${event.status}"` });
+    }
+
+    await pool.query("UPDATE event SET status = 'cancelled' WHERE id = $1", [eventId]);
+
+    // Notify registered students if event was published
+    if (event.status === "published") {
+        const { rows: registrations } = await pool.query(
+            "SELECT user_id FROM registration WHERE event_id = $1",
+            [eventId]
+        );
+        for (const reg of registrations) {
+            await notificationService.create({
+                userId: reg.user_id,
+                type: notificationService.NOTIFICATION_TYPES.EVENT_CANCELLED,
+                title: "Event cancelled",
+                message: `The event "${event.title}" has been cancelled by the organizer`,
+                relatedId: parseInt(eventId, 10),
+            });
+        }
+    }
+
+    res.json({ message: "Event cancelled" });
 }));
 
 

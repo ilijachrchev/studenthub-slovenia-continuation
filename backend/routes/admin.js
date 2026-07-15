@@ -214,6 +214,20 @@ router.post("/organizations/:id/reject", requireAdmin, catchAsync(async (req, re
     res.json({ message: "Organization rejected" });
 }));
 
+// POST /api/admin/events/:id/archive — archive an event
+router.post("/events/:id/archive", requireAdmin, catchAsync(async (req, res) => {
+    const { rowCount } = await pool.query(
+        "UPDATE event SET status = 'archived' WHERE id = $1 AND status IN ('published', 'completed', 'cancelled')",
+        [req.params.id]
+    );
+
+    if (rowCount === 0) {
+        return res.status(400).json({ error: "Event not found or cannot be archived" });
+    }
+
+    res.json({ message: "Event archived" });
+}));
+
 
 
 module.exports = router;

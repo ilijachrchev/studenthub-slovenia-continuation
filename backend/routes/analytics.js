@@ -22,10 +22,10 @@ router.get("/platform", requireAdmin, catchAsync(async (req, res) => {
     );
 
     const { rows: recentUsers } = await pool.query(
-        `SELECT DATE(created_at) AS date, COUNT(*)::int AS count
+        `SELECT date_trunc('day', created_at) AS date, COUNT(*)::int AS count
          FROM "user"
          WHERE created_at >= NOW() - INTERVAL '30 days'
-         GROUP BY DATE(created_at)
+         GROUP BY date_trunc('day', created_at)
          ORDER BY date ASC`
     );
 

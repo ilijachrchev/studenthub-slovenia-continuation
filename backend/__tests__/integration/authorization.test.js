@@ -62,6 +62,14 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await pool.query(
+    "DELETE FROM admin WHERE user_id IN (SELECT id FROM \"user\" WHERE email = $1)",
+    ["authz-admin@test.com"]
+  );
+  await pool.query(
+    "DELETE FROM organizer_profile WHERE user_id IN (SELECT id FROM \"user\" WHERE email IN ($1, $2))",
+    ["authz-organizer@test.com", "authz-student@famnit.upr.si"]
+  );
+  await pool.query(
     "DELETE FROM \"user\" WHERE email IN ($1, $2, $3)",
     ["authz-admin@test.com", "authz-organizer@test.com", "authz-student@famnit.upr.si"]
   );

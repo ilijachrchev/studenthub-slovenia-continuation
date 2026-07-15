@@ -64,6 +64,7 @@ router.get("/:id", catchAsync(async (req, res) => {
 
     const { rows: orgRows } = await pool.query(
         `SELECT o.id, o.name, o.description, o.logo, o.website, o.contact_email,
+            o.facebook, o.instagram, o.linkedin, o.twitter,
             u.name AS university_name
             FROM organization o
             LEFT JOIN university u ON o.university_id = u.id
@@ -123,6 +124,65 @@ router.get("/:id", catchAsync(async (req, res) => {
         .sort((a, b) => new Date(b.start_datetime) - new Date(a.start_datetime));
 
     res.json({organization, upcoming, past});
+}));
+
+// PUT /api/organizations/:id — update organization profile (owner only)
+router.put("/:id", requireAuth, requireRole("organizer"), catchAsync(async (req, res) => {
+    const orgId = parseInt(req.params.id, 10);
+
+    // Verify ownership
+    const { rows: membership } = await pool.query(
+        `SELECT 1 FROM organizer_profile
+         WHERE user_id = $1 AND organization_id = $2 AND role_in_org = 'owner'`,
+        [req.session.user.id, orgId]
+    );
+    if (!membership.length) {
+        return res.status(403).json({ error: "Only the organization owner can update the profile" });
+    }
+
+    const { description, logo, website, contact_email,
+            facebook, instagram, linkedin, twitter } = req.body;
+
+    const validationErrors = validateOrganization(req.body);
+    if (validationErrors.length > 0) {
+        return res.status(400).json({ error: validationErrors[0] });
+    }
+
+    const { rowCount } = await pool.query(
+        `UPDATE organization SET
+            description = COALESCE($1, description),
+            logo = COALESCE($2, logo),
+            website = COALESCE($3, website),
+            contact_email = COALESCE($4, contact_email),
+            facebook = $5,
+            instagram = $6,
+            linkedin = $7,
+            twitter = $8
+         WHERE id = $9 AND status = 'approved'`,
+        [description || null, logo || null, website || null, contact_email || null,
+         facebook || null, instagram || null, linkedin || null, twitter || null, orgId]
+    );
+
+    if (rowCount === 0) {
+        return res.status(404).json({ error: "Organization not found or not approved" });
+    }
+
+    res.json({ message: "Organization profile updated" });
+}));
+
+// GET /api/organizations/:id/members — list organization members (public)
+router.get("/:id/members", catchAsync(async (req, res) => {
+    const orgId = parseInt(req.params.id, 10);
+
+    const { rows: members } = await pool.query(
+        `SELECT u.id, u.first_name, u.last_name, op.role_in_org
+         FROM organizer_profile op
+         JOIN "user" u ON u.id = op.user_id
+         WHERE op.organization_id = $1`,
+        [orgId]
+    );
+
+    res.json({ members });
 }));
 
 module.exports = router;

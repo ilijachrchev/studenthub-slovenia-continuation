@@ -58,6 +58,19 @@ router.get("/my-application", requireAuth, catchAsync(async (req, res) => {
     res.json({ hasApplication: true, organization: rows[0] });
 }));
 
+// GET /api/organizations/followed — list followed organizations (MUST be before /:id)
+router.get("/followed", requireAuth, catchAsync(async (req, res) => {
+    const { rows } = await pool.query(
+        `SELECT o.id, o.name, o.logo, o.description, o.status
+         FROM organization_follower f
+         JOIN organization o ON o.id = f.organization_id
+         WHERE f.user_id = $1
+         ORDER BY f.created_at DESC`,
+        [req.session.user.id]
+    );
+    res.json({ organizations: rows });
+}));
+
 // /api/organizations GET method
 router.get("/:id", catchAsync(async (req, res) => {
     const orgId = req.params.id;
@@ -77,6 +90,24 @@ router.get("/:id", catchAsync(async (req, res) => {
     }
 
     const organization = orgRows[0];
+
+    // Add follower count
+    const { rows: followerRows } = await pool.query(
+        "SELECT COUNT(*)::int AS follower_count FROM organization_follower WHERE organization_id = $1",
+        [orgId]
+    );
+    organization.follower_count = followerRows[0].follower_count;
+
+    // Check if current user follows this org
+    if (req.session.user) {
+        const { rows: followRows } = await pool.query(
+            "SELECT 1 FROM organization_follower WHERE user_id = $1 AND organization_id = $2",
+            [req.session.user.id, orgId]
+        );
+        organization.is_following = followRows.length > 0;
+    } else {
+        organization.is_following = false;
+    }
 
     const { rows: events } = await pool.query(
         `SELECT e.id, e.title, e.description, e.location,
@@ -183,6 +214,49 @@ router.get("/:id/members", catchAsync(async (req, res) => {
     );
 
     res.json({ members });
+}));
+
+// POST /api/organizations/:id/follow — follow an organization
+router.post("/:id/follow", requireAuth, catchAsync(async (req, res) => {
+    const orgId = parseInt(req.params.id, 10);
+
+    // Check org exists and is approved
+    const { rows: org } = await pool.query(
+        "SELECT id FROM organization WHERE id = $1 AND status = 'approved'",
+        [orgId]
+    );
+    if (!org.length) {
+        return res.status(404).json({ error: "Organization not found" });
+    }
+
+    // Upsert follow
+    const { rows } = await pool.query(
+        `INSERT INTO organization_follower (user_id, organization_id)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id, organization_id) DO NOTHING
+         RETURNING id`,
+        [req.session.user.id, orgId]
+    );
+
+    if (rows.length === 0) {
+        return res.json({ message: "Already following" });
+    }
+    res.status(201).json({ message: "Following" });
+}));
+
+// DELETE /api/organizations/:id/follow — unfollow an organization
+router.delete("/:id/follow", requireAuth, catchAsync(async (req, res) => {
+    const orgId = parseInt(req.params.id, 10);
+
+    const { rowCount } = await pool.query(
+        "DELETE FROM organization_follower WHERE user_id = $1 AND organization_id = $2",
+        [req.session.user.id, orgId]
+    );
+
+    if (rowCount === 0) {
+        return res.status(404).json({ error: "Not following this organization" });
+    }
+    res.json({ message: "Unfollowed" });
 }));
 
 module.exports = router;

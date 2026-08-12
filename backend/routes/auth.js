@@ -52,10 +52,18 @@ router.post("/register", registerLimiter, catchAsync(async (req, res) => {
         if (!domain) {
             return res.status(400).json({ error: "Invalid email format" });
         }
+
+        const domainParts = domain.split(".");
+        const parentDomain = domainParts.length > 2 ? domainParts.slice(-2).join(".") : domain;
+
         const { rows: faculties } = await pool.query(
-            "SELECT id FROM faculty WHERE email_domain = $1",
-            [domain]
+            `SELECT id FROM faculty 
+            WHERE email_domain = $1 
+                OR email_domain = $2
+                OR email_domain LIKE '%.' || $2`,
+            [domain, parentDomain]
         );
+
         if (faculties.length === 0) {
             return res.status(400).json({
                 error: "Email domain not recognized. Please use your institutional email.",

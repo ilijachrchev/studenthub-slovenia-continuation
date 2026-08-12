@@ -123,10 +123,10 @@ router.put("/preferences", requireAuth, catchAsync(async (req, res) => {
   }
 
   const { rows } = await pool.query(
-    `INSERT INTO notification_preferences (user_id, preferences, updated_at)
-     VALUES ($1, $2::jsonb, NOW())
+    `INSERT INTO notification_preferences (user_id, preferences)
+     VALUES ($1, $2::jsonb)
      ON CONFLICT (user_id)
-     DO UPDATE SET preferences = EXCLUDED.preferences, updated_at = NOW()
+     DO UPDATE SET preferences = EXCLUDED.preferences
      RETURNING preferences`,
     [req.session.user.id, JSON.stringify(preferences)]
   );

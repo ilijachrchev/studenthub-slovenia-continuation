@@ -255,7 +255,7 @@ router.post("/:id/transition", requireAuth, catchAsync(async (req, res) => {
     }
 
     const { rowCount } = await client.query(
-      "UPDATE application SET status = $1, updated_at = NOW() WHERE id = $2 AND status = $3",
+      "UPDATE application SET status = $1 WHERE id = $2 AND status = $3",
       [to, applicationId, from]
     );
 

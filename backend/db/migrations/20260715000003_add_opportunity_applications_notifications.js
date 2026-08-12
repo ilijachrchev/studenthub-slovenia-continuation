@@ -240,14 +240,24 @@ async function ensureMutableColumns(knex) {
   }
 
   if (await knex.schema.hasTable("application")) {
+    await ensureColumn(
+      knex,
+      "application",
+      "updated_at TIMESTAMP",
+      "UPDATE application SET updated_at = COALESCE(updated_at, created_at, NOW()) WHERE updated_at IS NULL"
+    );
     await knex.raw("ALTER TABLE application ALTER COLUMN updated_at SET DEFAULT NOW()");
-    await knex.raw("UPDATE application SET updated_at = COALESCE(updated_at, created_at, NOW()) WHERE updated_at IS NULL");
     await knex.raw("ALTER TABLE application ALTER COLUMN updated_at SET NOT NULL");
   }
 
   if (await knex.schema.hasTable("notification_preferences")) {
+    await ensureColumn(
+      knex,
+      "notification_preferences",
+      "updated_at TIMESTAMP",
+      "UPDATE notification_preferences SET updated_at = COALESCE(updated_at, NOW()) WHERE updated_at IS NULL"
+    );
     await knex.raw("ALTER TABLE notification_preferences ALTER COLUMN updated_at SET DEFAULT NOW()");
-    await knex.raw("UPDATE notification_preferences SET updated_at = COALESCE(updated_at, NOW()) WHERE updated_at IS NULL");
     await knex.raw("ALTER TABLE notification_preferences ALTER COLUMN updated_at SET NOT NULL");
   }
 }

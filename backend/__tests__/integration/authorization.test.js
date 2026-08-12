@@ -2,7 +2,13 @@ const request = require("supertest");
 const app = require("../../app");
 const pool = require("../../db");
 
-let adminAgent, organizerAgent, studentAgent;
+let adminAgent, organizerAgent, studentAgent, otherStudentAgent;
+const createdEmails = [
+  "authz-admin@test.com",
+  "authz-organizer@test.com",
+  "authz-student@famnit.upr.si",
+  "authz-peer@famnit.upr.si",
+];
 
 beforeAll(async () => {
   // Register isolated test users to avoid race conditions with auth.test.js
@@ -43,6 +49,16 @@ beforeAll(async () => {
       role: "student",
     });
 
+  await request(app)
+    .post("/api/auth/register")
+    .send({
+      first_name: "AuthPeer",
+      last_name: "Tester",
+      email: "authz-peer@famnit.upr.si",
+      password: "testpass123",
+      role: "student",
+    });
+
   // Create logged-in agents for each role
   adminAgent = request.agent(app);
   await adminAgent
@@ -58,12 +74,17 @@ beforeAll(async () => {
   await studentAgent
     .post("/api/auth/login")
     .send({ email: "authz-student@famnit.upr.si", password: "testpass123" });
+
+  otherStudentAgent = request.agent(app);
+  await otherStudentAgent
+    .post("/api/auth/login")
+    .send({ email: "authz-peer@famnit.upr.si", password: "testpass123" });
 });
 
 afterAll(async () => {
   await pool.query(
-    "DELETE FROM \"user\" WHERE email IN ($1, $2, $3)",
-    ["authz-admin@test.com", "authz-organizer@test.com", "authz-student@famnit.upr.si"]
+    "DELETE FROM \"user\" WHERE email = ANY($1::text[])",
+    [createdEmails]
   );
 });
 
@@ -142,6 +163,25 @@ describe("Authorization middleware", () => {
         const meRes = await agent.get("/api/auth/me");
         expect(meRes.body.user.role).toBe("student");
       }
+    });
+  });
+
+  describe("resource ownership", () => {
+    test("only the owner can remove their saved bookmark", async () => {
+      const eventRes = await request(app).get("/api/events");
+      expect(eventRes.status).toBe(200);
+      expect(eventRes.body.events.length).toBeGreaterThan(0);
+
+      const eventId = eventRes.body.events[0].id;
+
+      const saveRes = await studentAgent.post(`/api/bookmarks/${eventId}`);
+      expect([201, 409]).toContain(saveRes.status);
+
+      const deleteByOtherUser = await otherStudentAgent.delete(`/api/bookmarks/${eventId}`);
+      expect(deleteByOtherUser.status).toBe(404);
+
+      const deleteByOwner = await studentAgent.delete(`/api/bookmarks/${eventId}`);
+      expect(deleteByOwner.status).toBe(200);
     });
   });
 });

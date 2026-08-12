@@ -13,7 +13,9 @@ const ALIASES = Object.freeze({
   declined: "rejected",
   cancelled: "withdrawn",
   canceled: "withdrawn",
+  review: "under_review",
   reviewing: "under_review",
+  in_review: "under_review",
 });
 
 const TRANSITIONS = Object.freeze({

@@ -1,6 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
 import logo from "../../assets/logo.png";
-import { useEffect, useState } from "react";
 
 function OrganizerSidebar () {
     const location = useLocation();

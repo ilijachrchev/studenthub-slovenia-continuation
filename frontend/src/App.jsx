@@ -23,6 +23,15 @@ import { AuthProvider } from "./context/AuthContext";
 import MyRegistrations from "./pages/MyRegistrations";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import RoleRoute from "./components/auth/RoleRoute";
+import Discovery from "./pages/opportunities/Discovery";
+import OpportunityDetail from "./pages/opportunities/OpportunityDetail";
+import MyApplications from "./pages/opportunities/MyApplications";
+import SavedOpportunities from "./pages/opportunities/SavedOpportunities";
+import Notifications from "./pages/notifications/Notifications";
+import ManageOpportunities from "./pages/organizer/opps/ManageOpportunities";
+import OpportunityApplicants from "./pages/organizer/opps/OpportunityApplicants";
+import OpportunityAnalytics from "./pages/organizer/analytics/OpportunityAnalytics";
+import ModerationQueue from "./pages/admin/moderation/ModerationQueue";
 
 
 export default function App() {
@@ -123,6 +132,51 @@ export default function App() {
             <StudentLayout>
               <SearchResults />
             </StudentLayout>
+          } />
+          <Route path="/opportunities" element={
+            <RoleRoute allowedRoles={["student"]}>
+              <StudentLayout><Discovery /></StudentLayout>
+            </RoleRoute>
+          } />
+          <Route path="/opportunities/:id" element={
+            <RoleRoute allowedRoles={["student"]}>
+              <StudentLayout><OpportunityDetail /></StudentLayout>
+            </RoleRoute>
+          } />
+          <Route path="/applications/mine" element={
+            <RoleRoute allowedRoles={["student"]}>
+              <StudentLayout><MyApplications /></StudentLayout>
+            </RoleRoute>
+          } />
+          <Route path="/saved-opportunities" element={
+            <RoleRoute allowedRoles={["student"]}>
+              <StudentLayout><SavedOpportunities /></StudentLayout>
+            </RoleRoute>
+          } />
+          <Route path="/notifications" element={
+            <ProtectedRoute>
+              <StudentLayout><Notifications /></StudentLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/organizer/opportunities" element={
+            <RoleRoute allowedRoles={["organizer"]}>
+              <ManageOpportunities />
+            </RoleRoute>
+          } />
+          <Route path="/organizer/opportunities/:id/applicants" element={
+            <RoleRoute allowedRoles={["organizer"]}>
+              <OpportunityApplicants />
+            </RoleRoute>
+          } />
+          <Route path="/organizer/analytics" element={
+            <RoleRoute allowedRoles={["organizer"]}>
+              <OpportunityAnalytics />
+            </RoleRoute>
+          } />
+          <Route path="/admin/moderation" element={
+            <RoleRoute allowedRoles={["admin"]}>
+              <ModerationQueue />
+            </RoleRoute>
           } />
         </Routes>
       </AuthProvider>

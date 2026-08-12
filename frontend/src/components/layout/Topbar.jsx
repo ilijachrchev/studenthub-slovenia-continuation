@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Bell, LogoutKopce } from "../reusable/Icons";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 function Topbar() {
 
@@ -42,13 +42,15 @@ function Topbar() {
         }
     };
 
-    const handleLogout = async (e) => {
+    const handleLogout = async () => {
         try {
             await fetch("/api/auth/logout", {
                 method: "POST",
                 credentials: "include",
             });
-        } catch {}
+        } catch {
+            // The session refresh below still updates the UI on network errors.
+        }
         await refreshUser();
         navigate("/login");
     }

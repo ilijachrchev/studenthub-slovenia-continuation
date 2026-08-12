@@ -45,7 +45,7 @@ function ResetPassword() {
       setCurrentPassword("");
       setNewPassword("");
       setLoading(false);
-    } catch (error) {
+    } catch {
       setError("Something went wrong. Please try again!");
       setLoading(false);
     }

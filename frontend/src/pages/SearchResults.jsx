@@ -12,6 +12,7 @@ function SearchResults() {
 
   useEffect(() => {
     if (!query) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setEvents([]);
         return;
     }

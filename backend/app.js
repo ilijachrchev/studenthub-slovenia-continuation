@@ -16,6 +16,12 @@ const adminRoutes = require("./routes/admin");
 const bookmarksRoutes = require("./routes/bookmarks");
 const feedbackRoutes = require("./routes/feedback");
 const searchRoutes = require("./routes/search");
+const opportunitiesRoutes = require("./routes/opportunities");
+const applicationsRoutes = require("./routes/applications");
+const notificationsRoutes = require("./routes/notifications");
+const recommendationsRoutes = require("./routes/recommendations");
+const analyticsRoutes = require("./routes/analytics");
+const moderationRoutes = require("./routes/moderation");
 const { validateOrigin } = require("./middleware/csrf");
 const logger = require("./middleware/logger");
 const pinoHttp = require("pino-http");
@@ -94,6 +100,22 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/bookmarks", bookmarksRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/search", searchRoutes);
+
+// Opportunity Hub routers are mounted directly at their public API namespaces.
+app.use("/api/opportunities", opportunitiesRoutes);
+app.use("/api/applications", applicationsRoutes);
+app.use("/api/notifications", notificationsRoutes);
+app.use("/api/recommendations", recommendationsRoutes);
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api/moderation", moderationRoutes);
+
+// Compatibility mounts for routers whose internal declarations include their
+// public namespace (for example, /opportunities/:id and /admin/moderation).
+app.use("/api", opportunitiesRoutes);
+app.use("/api", recommendationsRoutes);
+app.use("/api", analyticsRoutes);
+app.use("/api", moderationRoutes);
+
 
 const reactBuildPath = path.join(__dirname, './dist');
 if (fs.existsSync(reactBuildPath)) {

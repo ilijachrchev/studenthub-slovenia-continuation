@@ -23,6 +23,7 @@ export function AuthProvider({ children}) {
 }, []);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         refreshUser();
     }, [refreshUser]);
 
@@ -34,7 +35,7 @@ export function AuthProvider({ children}) {
     );
 }
 
-
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
     return useContext(AuthContext);
 }

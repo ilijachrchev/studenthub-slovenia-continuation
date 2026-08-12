@@ -34,7 +34,7 @@ function Saved() {
             credentials: "include",
         });
     } catch {
-
+        // The optimistic removal remains in place when the delete request fails.
     }
   };
 

@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "start:prod": "node server.js",
     "test": "jest",
     "db:migrate": "knex migrate:latest",
     "db:rollback": "knex migrate:rollback",

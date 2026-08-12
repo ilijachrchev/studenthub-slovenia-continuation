@@ -3,18 +3,18 @@ services:
     image: postgres:16
     container_name: studenthub-postgres
     environment:
-      POSTGRES_DB: SISIII2026_89241041
-      POSTGRES_USER: studenti
-      POSTGRES_PASSWORD: studentipass
-    ports:
-      - "5433:5432"
+      POSTGRES_DB: ${DB_DATABASE:-SISIII2026_89241041}
+      POSTGRES_USER: ${DB_USER:-studenti}
+      POSTGRES_PASSWORD: ${DB_PASS:-studentipass}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U studenti -d SISIII2026_89241041"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-studenti} -d ${DB_DATABASE:-SISIII2026_89241041}"]
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
+    stop_grace_period: 30s
 
   backend:
     build: ./backend
@@ -22,21 +22,24 @@ services:
     ports:
       - "30011:30011"
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       DB_CLIENT: pg
       DB_HOST: db
-      DB_USER: studenti
-      DB_PASS: studentipass
-      DB_DATABASE: SISIII2026_89241041
+      DB_USER: ${DB_USER:-studenti}
+      DB_PASS: ${DB_PASS:-studentipass}
+      DB_DATABASE: ${DB_DATABASE:-SISIII2026_89241041}
       DB_PORT: 5432
-      SESSION_SECRET: dev-session-secret-change-in-production
-      FRONTEND_URL: http://localhost:30010
-      TRUST_PROXY: "false"
-      COOKIE_SECURE: "false"
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+      FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
+      TRUST_PROXY: "true"
+      COOKIE_SECURE: "true"
       RUN_MIGRATIONS_ON_STARTUP: "true"
-      RUN_SEEDS_ON_STARTUP: "true"
-      LOG_LEVEL: debug
+      RUN_SEEDS_ON_STARTUP: "false"
+      LOG_LEVEL: info
       PORT: 30011
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -48,9 +51,6 @@ services:
       retries: 6
     restart: unless-stopped
     stop_grace_period: 30s
-    depends_on:
-      db:
-        condition: service_healthy
 
 volumes:
   postgres_data:

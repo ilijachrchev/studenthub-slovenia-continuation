@@ -25,11 +25,11 @@ The core loop, end to end:
 | Layer | Technology |
 |---|---|
 | Frontend | React + Vite, `react-router-dom`, plain global CSS |
-| Backend | Node.js + Express, `express-session`, `bcryptjs`, `mysql2` |
+| Backend | Node.js + Express, `express-session`, `bcryptjs`, `pg` |
 
 **Ports:** frontend dev server on **30010**, backend on **30011**.
 
-**Server:** hosted on the shared university server `88.200.63.148`. phpMyAdmin at `http://88.200.63.148/phpmyadmin`.
+**Server:** hosted on the shared university server `88.200.63.148`.
 
 ---
 
@@ -42,7 +42,7 @@ Browser (React, :30010)
 Vite dev proxy  ──►  Express API (:30011)
                           │
                           ▼
-                     MySQL / MariaDB
+                     PostgreSQL
                      (SISIII2026_89241041)
 ```
 
@@ -79,22 +79,24 @@ Event lifecycle status: `draft → submitted → published` or `rejected`.
 ## Setup
 
 ### Prerequisites
-Node.js + npm, Docker + Docker Compose (for local DB), and access to the MySQL database on `88.200.63.148`.
+Node.js + npm, Docker + Docker Compose (for local DB), and access to the PostgreSQL database on `88.200.63.148`.
 
 ### Quick start with Docker
 
 The fastest way to get a local database running:
 
 ```bash
-docker compose up -d        # starts MySQL + backend (runs migrations + seeds automatically)
+docker compose up -d        # starts PostgreSQL + backend (runs migrations + seeds automatically)
 cd frontend && npm run dev  # frontend on :30010
 ```
 
 The Docker backend automatically:
-1. Waits for MySQL to be healthy
+1. Waits for PostgreSQL to be healthy
 2. Runs all pending migrations (`npm run db:migrate`)
 3. Seeds development data (`npm run db:seed`)
 4. Starts the server
+
+For production, use [`docs/production-runbook.md`](./docs/production-runbook.md) and `docker-compose.prod.yml`. Production uses PostgreSQL, request IDs, `/api/ready`, and boot-time config validation.
 
 #### Docker workflow commands
 
@@ -107,6 +109,7 @@ The Docker backend automatically:
 | `docker compose logs -f backend` | Follow backend logs |
 | `docker compose exec backend npm run db:status` | Check migration status inside container |
 | `docker compose exec backend npm run db:reset` | Reset database inside container |
+| `docker compose -f docker-compose.prod.yml up -d --build` | Start the production stack |
 
 #### Fresh start (Docker)
 
@@ -129,7 +132,7 @@ cd frontend && npm run dev
 
 1. Create the database:
    ```bash
-   mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS SISIII2026_89241041 CHARACTER SET utf8 COLLATE utf8_unicode_ci;"
+   createdb SISIII2026_89241041
    ```
 
 2. Configure environment:
@@ -160,12 +163,12 @@ docker compose up -d       # runs migrations + seeds automatically
 
 1. Create the database and import the schema:
    ```bash
-   mysql -u studenti -p < backend/db/schema.sql
+   psql -U studenti -d SISIII2026_89241041 -f backend/db/schema.sql
    ```
 
 2. (Optional) Import development seed data:
    ```bash
-   mysql -u studenti -p < backend/db/seed.sql
+   psql -U studenti -d SISIII2026_89241041 -f backend/db/seed.sql
    ```
 
 #### Migration commands
@@ -199,13 +202,15 @@ node server.js          # starts on :30011
 
 The `.env` file (gitignored) requires:
 ```
+DB_CLIENT=pg
 DB_HOST=localhost
 DB_USER=studenti
-DB_PASSWORD=********
+DB_PASS=********
 DB_DATABASE=SISIII2026_89241041
-DB_PORT=3306
+DB_PORT=5432
 SESSION_SECRET=********
 FRONTEND_URL=http://localhost:30010
+TRUST_PROXY=false
 PORT=30011
 ```
 
@@ -222,7 +227,7 @@ Then open the app at the frontend host (e.g. `http://88.200.63.148:30010`).
 
 ## Dependencies
 
-**Backend:** `express`, `mysql2`, `express-session`, `bcryptjs`, `dotenv`, plus Node's built-in `crypto` (ticket codes).
+**Backend:** `express`, `pg`, `express-session`, `bcryptjs`, `dotenv`, plus Node's built-in `crypto` (ticket codes).
 
 **Frontend:** `react`, `react-dom`, `react-router-dom`, `vite`, `qrcode.react`.
 
@@ -233,6 +238,7 @@ Then open the app at the frontend host (e.g. `http://88.200.63.148:30010`).
 - **One feature per branch** → pull request into `dev` (merge commits, so the branch history is visible) → merge `dev` into `main` only at tested milestones.
 - Small, incremental, meaningful commits.
 - See `backend/README.md` for how to test every endpoint.
+- See [`docs/production-runbook.md`](./docs/production-runbook.md) for production deploy, health, and recovery steps.
 
 ---
 

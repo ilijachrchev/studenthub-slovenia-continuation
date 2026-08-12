@@ -11,6 +11,10 @@ Every endpoint in the StudentHub Slovenia API: method, path, who can call it, th
 - Body keys are `snake_case`.
 - For local backend tests, use the PostgreSQL service from `docker-compose.yml` or any equivalent instance that exposes `studenti / studentipass` on `localhost:5433` and lets the test database `studenthub_test` be created. The Jest global setup runs the migrations and seeds automatically before the integration suite.
 
+## Production operations
+
+See [`../docs/production-runbook.md`](../docs/production-runbook.md) for the deploy, health, logging, migration, and recovery steps that match the current runtime behavior.
+
 ---
 
 ## Auth — `routes/auth.js`

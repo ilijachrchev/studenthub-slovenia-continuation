@@ -23,6 +23,11 @@ const REQUIRED_TABLES = [
   "bookmark",
   "registration",
   "feedback",
+  "opportunity",
+  "application",
+  "application_history",
+  "notification_preferences",
+  "notification",
 ];
 
 const REQUIRED_INDEXES = [
@@ -34,6 +39,33 @@ const REQUIRED_INDEXES = [
   { table: "registration", index: "idx_registration_event" },
   { table: "event", index: "idx_event_status_start" },
   { table: "event", index: "idx_event_org_status" },
+  { table: "opportunity", index: "idx_opportunity_status" },
+  { table: "opportunity", index: "idx_opportunity_deadline" },
+  { table: "opportunity", index: "idx_opportunity_organization" },
+  { table: "opportunity", index: "idx_opportunity_status_deadline" },
+  { table: "opportunity", index: "idx_opportunity_organization_status" },
+  { table: "application", index: "idx_application_opportunity" },
+  { table: "application", index: "idx_application_applicant" },
+  { table: "application", index: "idx_application_status" },
+  { table: "application", index: "idx_application_opportunity_status" },
+  { table: "application", index: "idx_application_applicant_created" },
+  { table: "application_history", index: "idx_application_history_application" },
+  { table: "notification", index: "idx_notification_recipient_created" },
+  { table: "notification", index: "idx_notification_recipient_read" },
+];
+
+const REQUIRED_CHECK_CONSTRAINTS = [
+  { table: "opportunity", constraint: "chk_opportunity_status" },
+  { table: "application", constraint: "chk_application_status" },
+  { table: "application_history", constraint: "chk_application_history_action" },
+  { table: "application_history", constraint: "chk_application_history_from_status" },
+  { table: "application_history", constraint: "chk_application_history_to_status" },
+];
+
+const REQUIRED_TRIGGERS = [
+  { table: "opportunity", trigger: "trg_opportunity_updated_at" },
+  { table: "application", trigger: "trg_application_updated_at" },
+  { table: "notification_preferences", trigger: "trg_notification_preferences_updated_at" },
 ];
 
 async function verify() {
@@ -78,6 +110,34 @@ async function verify() {
       } else {
         warnings.push(`Missing index: ${table}.${index}`);
         console.log(`  ⚠ ${table}.${index} (not found)`);
+      }
+    }
+
+    console.log("\nChecking required constraints...");
+    for (const { table, constraint } of REQUIRED_CHECK_CONSTRAINTS) {
+      const { rows } = await db.raw(
+        "SELECT 1 FROM pg_constraint WHERE conrelid = ?::regclass AND conname = ? LIMIT 1",
+        [table, constraint]
+      );
+      if (rows.length > 0) {
+        console.log(`  ✓ ${table}.${constraint}`);
+      } else {
+        warnings.push(`Missing constraint: ${table}.${constraint}`);
+        console.log(`  ⚠ ${table}.${constraint} (not found)`);
+      }
+    }
+
+    console.log("\nChecking required triggers...");
+    for (const { table, trigger } of REQUIRED_TRIGGERS) {
+      const { rows } = await db.raw(
+        "SELECT 1 FROM pg_trigger WHERE tgrelid = ?::regclass AND tgname = ? LIMIT 1",
+        [table, trigger]
+      );
+      if (rows.length > 0) {
+        console.log(`  ✓ ${table}.${trigger}`);
+      } else {
+        warnings.push(`Missing trigger: ${table}.${trigger}`);
+        console.log(`  ⚠ ${table}.${trigger} (not found)`);
       }
     }
 

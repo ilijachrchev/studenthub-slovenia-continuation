@@ -37,6 +37,20 @@ async function status() {
       "SELECT COUNT(*)::int AS count FROM information_schema.tables WHERE table_schema = 'public'"
     );
     console.log(`\nTables: ${rows[0].count}`);
+
+    const { rows: opportunityRows } = await db.raw(
+      `SELECT COUNT(*)::int AS count
+       FROM information_schema.tables
+       WHERE table_schema = 'public'
+         AND table_name IN (
+           'opportunity',
+           'application',
+           'application_history',
+           'notification_preferences',
+           'notification'
+         )`
+    );
+    console.log(`Opportunity tables: ${opportunityRows[0].count}/5`);
   } catch (err) {
     console.error("\nStatus check failed:", err.message);
     process.exit(1);

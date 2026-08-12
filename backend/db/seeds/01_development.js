@@ -35,6 +35,11 @@ exports.seed = async function (knex) {
     "bookmark",
     "registration",
     "feedback",
+    "opportunity",
+    "application",
+    "application_history",
+    "notification_preferences",
+    "notification",
   ];
 
   const missingTables = [];
@@ -103,6 +108,152 @@ exports.seed = async function (knex) {
   await knex("organizer_profile").insert([
     { user_id: 2, organization_id: 1, role_in_org: "owner" },
   ]).onConflict(["user_id", "organization_id"]).ignore();
+
+  // Opportunities
+  await knex("opportunity").insert([
+    {
+      id: 1,
+      organization_id: 1,
+      title: "Open Source Mentorship",
+      description: "Pair with maintainers on real issues and contribute to live projects.",
+      location: "Koper",
+      deadline: "2026-10-01 12:00:00",
+      status: "published",
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+      published_at: knex.fn.now(),
+    },
+    {
+      id: 2,
+      organization_id: 1,
+      title: "Design Sprint Intern",
+      description: "Help shape campus event tooling with product and visual design work.",
+      location: "Remote",
+      deadline: "2026-10-15 12:00:00",
+      status: "draft",
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+      published_at: null,
+    },
+    {
+      id: 3,
+      organization_id: 1,
+      title: "AI Research Assistant",
+      description: "Support data collection and experiment tracking for a student research group.",
+      location: "Ljubljana",
+      deadline: "2026-09-20 12:00:00",
+      status: "submitted",
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+      published_at: null,
+    },
+    {
+      id: 4,
+      organization_id: 3,
+      title: "Game Studio Volunteer",
+      description: "Assist with playtesting, build reviews, and community support.",
+      location: "Maribor",
+      deadline: "2026-08-01 12:00:00",
+      status: "closed",
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+      published_at: knex.fn.now(),
+    },
+    {
+      id: 5,
+      organization_id: 3,
+      title: "Archived Portfolio Review",
+      description: "An archived opportunity kept for historical reference in the admin UI.",
+      location: "Koper",
+      deadline: "2026-07-01 12:00:00",
+      status: "archived",
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+      published_at: knex.fn.now(),
+    },
+    {
+      id: 6,
+      organization_id: 1,
+      title: "Rejected Event Partnerships",
+      description: "Placeholder record for rejected opportunity lifecycle coverage.",
+      location: "Koper",
+      deadline: "2026-09-10 12:00:00",
+      status: "rejected",
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+      published_at: null,
+    },
+  ]).onConflict("id").ignore();
+
+  // Opportunity applications
+  await knex("application").insert([
+    {
+      id: 1,
+      opportunity_id: 1,
+      applicant_user_id: 3,
+      cover_note: "I have contributed to several open-source tools and can help on day one.",
+      status: "pending",
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+    },
+  ]).onConflict("id").ignore();
+
+  await knex("application_history").insert([
+    {
+      id: 1,
+      application_id: 1,
+      action: "application_created",
+      from_status: null,
+      to_status: "pending",
+      actor_user_id: 3,
+      created_at: knex.fn.now(),
+    },
+  ]).onConflict("id").ignore();
+
+  await knex("notification_preferences").insert([
+    {
+      user_id: 2,
+      preferences: knex.raw(
+        "?::jsonb",
+        [JSON.stringify({
+          "application.received": true,
+          "application.status_changed": true,
+        })]
+      ),
+      updated_at: knex.fn.now(),
+    },
+    {
+      user_id: 3,
+      preferences: knex.raw(
+        "?::jsonb",
+        [JSON.stringify({
+          "application.received": true,
+          "application.status_changed": true,
+        })]
+      ),
+      updated_at: knex.fn.now(),
+    },
+  ]).onConflict("user_id").ignore();
+
+  await knex("notification").insert([
+    {
+      id: 1,
+      recipient_user_id: 2,
+      type: "application.received",
+      payload: knex.raw(
+        "?::jsonb",
+        [JSON.stringify({
+          applicationId: 1,
+          opportunityId: 1,
+          applicantUserId: 3,
+          opportunityTitle: "Open Source Mentorship",
+        })]
+      ),
+      is_read: false,
+      created_at: knex.fn.now(),
+      read_at: null,
+    },
+  ]).onConflict("id").ignore();
 
   // Events
   await knex("event").insert([

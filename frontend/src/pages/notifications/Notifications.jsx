@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
+import ApplicationStatusBadge from "../../components/opportunities/ApplicationStatusBadge";
 import {
   formatDateTime,
-  normaliseNotification,
-  toArray,
-  unwrapMessage,
 } from "../../components/opportunities/opportunitiesUtils";
-import ApplicationStatusBadge from "../../components/opportunities/ApplicationStatusBadge";
+import { useNotifications } from "../../context/NotificationsContext";
+import PageState, { InlineState } from "../../components/shared/PageState";
 import "./../opportunities/css/opportunities.css";
 
 const DEFAULT_PREFERENCES = {
@@ -15,132 +14,56 @@ const DEFAULT_PREFERENCES = {
 };
 
 function Notifications() {
-  const [notifications, setNotifications] = useState([]);
-  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [savingPreferences, setSavingPreferences] = useState(false);
+  const {
+    notifications,
+    preferences,
+    loading,
+    refreshing,
+    listError,
+    preferencesError,
+    actionError,
+    successMessage,
+    unreadCount,
+    reload,
+    markRead,
+    markAllRead,
+    updatePreferences,
+    clearActionError,
+    clearSuccessMessage,
+  } = useNotifications();
 
-  useEffect(() => {
-    let alive = true;
-
-    async function loadNotifications() {
-      try {
-        const [listRes, prefsRes] = await Promise.all([
-          fetch("/api/notifications", { credentials: "include" }),
-          fetch("/api/notifications/preferences", { credentials: "include" }),
-        ]);
-        const listData = await listRes.json().catch(() => ({}));
-        const prefsData = await prefsRes.json().catch(() => ({}));
-
-        if (!alive) return;
-
-        if (!listRes.ok) {
-          setError(unwrapMessage(listData, "Failed to load notifications"));
-          return;
-        }
-
-        setNotifications(toArray(listData.notifications || listData.items || listData).map(normaliseNotification));
-        setPreferences((current) => ({
-          ...current,
-          ...(prefsData.preferences || prefsData),
-        }));
-      } catch {
-        if (alive) setError("Failed to load notifications");
-      } finally {
-        if (alive) setLoading(false);
-      }
-    }
-
-    loadNotifications();
-
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(async () => {
-      try {
-        const response = await fetch("/api/notifications?unread=1", {
-          credentials: "include",
-        });
-        const data = await response.json().catch(() => ({}));
-        if (response.ok) {
-          const unreadIds = new Set(
-            toArray(data.notifications || data.items || data).map((notification) =>
-              String(notification.id ?? notification.notification_id)
-            )
-          );
-          setNotifications((current) =>
-            current.map((item) => ({ ...item, unread: unreadIds.has(String(item.id)) }))
-          );
-        }
-      } catch (error) {
-        void error;
-      }
-    }, 60000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  const unreadCount = notifications.filter((notification) => notification.unread).length;
-
-  const markRead = async (notification) => {
-    setNotifications((current) =>
-      current.map((item) => (item.id === notification.id ? { ...item, unread: false } : item))
-    );
-
-    try {
-      const response = await fetch(`/api/notifications/${notification.id}/read`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("read-failed");
-    } catch {
-      setNotifications((current) =>
-        current.map((item) => (item.id === notification.id ? { ...item, unread: true } : item))
-      );
-    }
-  };
-
-  const markAllRead = async () => {
-    const previous = notifications;
-    setNotifications((current) => current.map((item) => ({ ...item, unread: false })));
-
-    try {
-      const response = await fetch("/api/notifications/read-all", {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("read-all-failed");
-    } catch {
-      setNotifications(previous);
-    }
-  };
+  const preferenceItems = useMemo(
+    () => [
+      {
+        key: "application_updates",
+        title: "Application updates",
+        description: "Status changes and withdrawal confirmations.",
+      },
+      {
+        key: "recommendation_updates",
+        title: "Recommendations",
+        description: "New matches and discovery suggestions.",
+      },
+      {
+        key: "deadline_reminders",
+        title: "Deadline reminders",
+        description: "Heads-up notifications before an opportunity closes.",
+      },
+    ],
+    [],
+  );
 
   const togglePreference = async (key) => {
-    const nextPreferences = { ...preferences, [key]: !preferences[key] };
-    setPreferences(nextPreferences);
-    setSavingPreferences(true);
-
-    try {
-      const response = await fetch("/api/notifications/preferences", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(nextPreferences),
-      });
-      if (!response.ok) throw new Error("prefs-failed");
-    } catch {
-      setPreferences((current) => ({ ...current, [key]: preferences[key] }));
-    } finally {
-      setSavingPreferences(false);
-    }
+    await updatePreferences({
+      ...DEFAULT_PREFERENCES,
+      ...preferences,
+      [key]: !preferences[key],
+    });
   };
 
-  if (loading) return <p className="opp-page-status">Loading notifications...</p>;
-  if (error) return <p className="opp-page-status error-text">{error}</p>;
+  if (loading) {
+    return <PageState variant="loading" title="Loading notifications" message="Fetching your inbox and preferences." />;
+  }
 
   return (
     <div className="opp-page opp-page-shell">
@@ -148,40 +71,63 @@ function Notifications() {
         <div className="opp-page-kicker">Inbox</div>
         <h1 className="opp-page-title">Notifications</h1>
         <p className="opp-page-subtitle">
-          Stay on top of application updates, recommendations, and deadlines. Unread items are
-          checked automatically in the topbar.
+          Stay on top of application updates, recommendations, and deadlines. Unread items sync with the topbar after refresh.
         </p>
       </section>
+
+      {refreshing && (
+        <InlineState
+          variant="loading"
+          message="Refreshing notifications..."
+          className="notifications-refresh"
+        />
+      )}
+
+      {actionError && (
+        <InlineState
+          variant="error"
+          message={actionError}
+          actionLabel="Dismiss"
+          onAction={clearActionError}
+        />
+      )}
+
+      {successMessage && (
+        <InlineState
+          variant="success"
+          message={successMessage}
+          actionLabel="Dismiss"
+          onAction={clearSuccessMessage}
+        />
+      )}
+
+      {(listError || preferencesError) && (
+        <div className="opp-panel" role="status" aria-live="polite">
+          {listError && <p className="error-text">{listError}</p>}
+          {preferencesError && <p className="error-text">{preferencesError}</p>}
+          <div className="opp-actions" style={{ marginTop: 12 }}>
+            <button type="button" className="opp-secondary-btn" onClick={reload}>
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="opp-notifications-head">
         <div className="opp-toolbar-meta">
           {unreadCount} unread notification{unreadCount === 1 ? "" : "s"}
         </div>
-        <button type="button" className="opp-secondary-btn" onClick={markAllRead}>
+        <button type="button" className="opp-secondary-btn" onClick={markAllRead} disabled={unreadCount === 0}>
           Mark all read
         </button>
       </div>
 
-      <section className="opp-panel">
-        <h2>Preferences</h2>
+      <section className="opp-panel" aria-labelledby="notification-preferences-title">
+        <div className="panel-heading">
+          <h2 id="notification-preferences-title">Preferences</h2>
+        </div>
         <div className="opp-toggle-list">
-          {[
-            {
-              key: "application_updates",
-              title: "Application updates",
-              description: "Status changes and withdrawal confirmations.",
-            },
-            {
-              key: "recommendation_updates",
-              title: "Recommendations",
-              description: "New matches and discovery suggestions.",
-            },
-            {
-              key: "deadline_reminders",
-              title: "Deadline reminders",
-              description: "Heads-up notifications before an opportunity closes.",
-            },
-          ].map((item) => (
+          {preferenceItems.map((item) => (
             <div key={item.key} className="opp-toggle">
               <label htmlFor={item.key}>
                 <strong>{item.title}</strong>
@@ -192,8 +138,8 @@ function Notifications() {
                 type="button"
                 className={`opp-switch ${preferences[item.key] ? "on" : ""}`}
                 onClick={() => togglePreference(item.key)}
-                aria-pressed={preferences[item.key]}
-                disabled={savingPreferences}
+                aria-pressed={Boolean(preferences[item.key])}
+                aria-label={`${preferences[item.key] ? "Disable" : "Enable"} ${item.title.toLowerCase()}`}
               />
             </div>
           ))}
@@ -201,9 +147,13 @@ function Notifications() {
       </section>
 
       {notifications.length === 0 ? (
-        <div className="opp-empty">You have no notifications yet.</div>
+        <PageState
+          variant="empty"
+          title="No notifications yet"
+          message="You have no notifications right now."
+        />
       ) : (
-        <div className="opp-notification-list">
+        <div className="opp-notification-list" aria-live="polite">
           {notifications.map((notification) => (
             <article
               key={notification.id}
@@ -226,7 +176,11 @@ function Notifications() {
 
               {notification.unread && (
                 <div className="opp-actions" style={{ marginTop: 14 }}>
-                  <button type="button" className="opp-secondary-btn" onClick={() => markRead(notification)}>
+                  <button
+                    type="button"
+                    className="opp-secondary-btn"
+                    onClick={() => markRead(notification.id)}
+                  >
                     Mark read
                   </button>
                 </div>

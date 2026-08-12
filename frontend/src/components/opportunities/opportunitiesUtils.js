@@ -212,12 +212,17 @@ export function normaliseApplication(application = {}) {
 }
 
 export function normaliseNotification(notification = {}) {
+  const unreadValue =
+    notification.unread ??
+    notification.is_unread ??
+    (typeof notification.is_read === "boolean" ? !notification.is_read : undefined);
+
   return {
     ...notification,
     id: notification.id ?? notification.notification_id,
     title: notification.title ?? notification.subject ?? "Notification",
     body: notification.body ?? notification.message ?? "",
-    unread: Boolean(notification.unread ?? notification.is_unread ?? notification.read_at == null),
+    unread: Boolean(unreadValue ?? notification.read_at == null),
     createdAt:
       notification.created_at ??
       notification.createdAt ??

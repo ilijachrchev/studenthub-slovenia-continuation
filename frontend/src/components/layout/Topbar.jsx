@@ -1,15 +1,15 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Bell, LogoutKopce } from "../reusable/Icons";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useNotifications } from "../../context/NotificationsContext";
 
 function Topbar() {
     const { user, loading, refreshUser } = useAuth();
+    const { unreadCount } = useNotifications();
     const navigate = useNavigate();
     const [term, setTerm] = useState("");
-    const [unreadCount, setUnreadCount] = useState(0);
     const timerRef = useRef(null);
-    const notificationTimerRef = useRef(null);
 
     const initials = user
         ? `${user.first_name?.[0] ?? ""}${user.last_name?.[0] ?? ""}`.toUpperCase()
@@ -55,46 +55,6 @@ function Topbar() {
         await refreshUser();
         navigate("/login");
     };
-
-    useEffect(() => {
-        if (!user) {
-            queueMicrotask(() => setUnreadCount(0));
-            return undefined;
-        }
-
-        let alive = true;
-
-        const loadUnreadCount = async () => {
-            try {
-                const response = await fetch("/api/notifications?unread=1", {
-                    credentials: "include",
-                });
-                const data = await response.json().catch(() => ({}));
-
-                if (!alive || !response.ok) return;
-
-                if (typeof data.unreadCount === "number") {
-                    setUnreadCount(data.unreadCount);
-                    return;
-                }
-
-                const items = Array.isArray(data)
-                    ? data
-                    : data.notifications || data.items || data.data || [];
-                setUnreadCount(items.length);
-            } catch {
-                if (alive) setUnreadCount(0);
-            }
-        };
-
-        loadUnreadCount();
-        notificationTimerRef.current = setInterval(loadUnreadCount, 60000);
-
-        return () => {
-            alive = false;
-            if (notificationTimerRef.current) clearInterval(notificationTimerRef.current);
-        };
-    }, [user]);
 
     return (
         <header className="app-topbar">

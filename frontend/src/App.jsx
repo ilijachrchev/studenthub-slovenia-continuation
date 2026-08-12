@@ -20,111 +20,169 @@ import OrganizationProfile from "./pages/OrganizationProfile";
 import SearchResults from "./pages/SearchResults";
 import ResetPassword from "./pages/ResetPassword";
 import { AuthProvider } from "./context/AuthContext";
+import { NotificationsProvider } from "./context/NotificationsContext";
 import MyRegistrations from "./pages/MyRegistrations";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import RoleRoute from "./components/auth/RoleRoute";
+import ManageOpportunities from "./pages/organizer/opps/ManageOpportunities";
+import OpportunityApplicants from "./pages/organizer/opps/OpportunityApplicants";
+import OpportunityAnalytics from "./pages/organizer/analytics/OpportunityAnalytics";
+import ModerationQueue from "./pages/admin/moderation/ModerationQueue";
+import Notifications from "./pages/notifications/Notifications";
+import RoleAwareLayout from "./components/layout/RoleAwareLayout";
 
 
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/" element={
-            <StudentLayout>
-              <Home />
-            </StudentLayout>
-          } />
-          <Route path="/login" element={<Login />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/setup-organization" element={
-            <RoleRoute allowedRoles={["organizer"]}>
-              <SetupOrganization />
-            </RoleRoute>
-          } />
-          <Route path="/setup-feed" element={
-            <ProtectedRoute>
-              <SetupFeed />
-            </ProtectedRoute>
-          } />
-          <Route path="/application-status" element={
-            <RoleRoute allowedRoles={["organizer"]}>
-              <ApplicationStatus />
-            </RoleRoute>
-          } />
-          <Route path="/events/:id" element={
-            <StudentLayout>
-              <EventDetail />
-            </StudentLayout>  
-          } />
-          <Route path="/organizations/:id" element={
-            <StudentLayout>
-              <OrganizationProfile />
-            </StudentLayout>  
-          } />
-          <Route path="/my-registrations" element={
-            <ProtectedRoute>
+        <NotificationsProvider>
+          <Routes>
+            <Route path="/" element={
               <StudentLayout>
-                <MyRegistrations />
+                <Home />
               </StudentLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/organizer" element={
-            <RoleRoute allowedRoles={["organizer"]}>
-              <OrganizerLayout>
-                <OrganizerDashboard />
-              </OrganizerLayout>
-            </RoleRoute>
-          } />
-          <Route path="/organizer/events/new" element={
-            <RoleRoute allowedRoles={["organizer"]}>
-              <OrganizerLayout>
-                <CreateEvent />
-              </OrganizerLayout>
-            </RoleRoute>
-          } />
-          <Route path="/admin" element={
-            <RoleRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <PendingEvents />
-              </AdminLayout>
-            </RoleRoute>
-          } />
-          <Route path="/admin/organizations" element={
-            <RoleRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <PendingOrganizations />
-              </AdminLayout>
-            </RoleRoute>
-          } />
-          <Route path="/settings" element={
-            <ProtectedRoute>
+            } />
+            <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/setup-organization" element={
+              <RoleRoute allowedRoles={["organizer"]}>
+                <SetupOrganization />
+              </RoleRoute>
+            } />
+            <Route path="/setup-feed" element={
+              <ProtectedRoute>
+                <SetupFeed />
+              </ProtectedRoute>
+            } />
+            <Route path="/application-status" element={
+              <RoleRoute allowedRoles={["organizer"]}>
+                <ApplicationStatus />
+              </RoleRoute>
+            } />
+            <Route path="/events/:id" element={
               <StudentLayout>
-                <AccountSettings />
+                <EventDetail />
               </StudentLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/saved" element={
-            <ProtectedRoute>
+            } />
+            <Route path="/organizations/:id" element={
               <StudentLayout>
-                <Saved />
+                <OrganizationProfile />
               </StudentLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/events/:eventId/feedback" element={
-            <ProtectedRoute>
+            } />
+            <Route path="/my-registrations" element={
+              <ProtectedRoute>
+                <StudentLayout>
+                  <MyRegistrations />
+                </StudentLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer" element={
+              <RoleRoute allowedRoles={["organizer"]}>
+                <OrganizerLayout>
+                  <OrganizerDashboard />
+                </OrganizerLayout>
+              </RoleRoute>
+            } />
+            <Route path="/organizer/events/new" element={
+              <RoleRoute allowedRoles={["organizer"]}>
+                <OrganizerLayout>
+                  <CreateEvent />
+                </OrganizerLayout>
+              </RoleRoute>
+            } />
+            <Route path="/organizer/opportunities" element={
+              <RoleRoute allowedRoles={["organizer"]}>
+                <OrganizerLayout>
+                  <ManageOpportunities />
+                </OrganizerLayout>
+              </RoleRoute>
+            } />
+            <Route path="/organizer/opportunities/applicants" element={
+              <RoleRoute allowedRoles={["organizer"]}>
+                <OrganizerLayout>
+                  <OpportunityApplicants />
+                </OrganizerLayout>
+              </RoleRoute>
+            } />
+            <Route path="/organizer/opportunities/:id/applicants" element={
+              <RoleRoute allowedRoles={["organizer"]}>
+                <OrganizerLayout>
+                  <OpportunityApplicants />
+                </OrganizerLayout>
+              </RoleRoute>
+            } />
+            <Route path="/organizer/opportunities/analytics" element={
+              <RoleRoute allowedRoles={["organizer"]}>
+                <OrganizerLayout>
+                  <OpportunityAnalytics />
+                </OrganizerLayout>
+              </RoleRoute>
+            } />
+            <Route path="/organizer/opportunities/:id/analytics" element={
+              <RoleRoute allowedRoles={["organizer"]}>
+                <OrganizerLayout>
+                  <OpportunityAnalytics />
+                </OrganizerLayout>
+              </RoleRoute>
+            } />
+            <Route path="/admin" element={
+              <RoleRoute allowedRoles={["admin"]}>
+                <AdminLayout>
+                  <PendingEvents />
+                </AdminLayout>
+              </RoleRoute>
+            } />
+            <Route path="/admin/organizations" element={
+              <RoleRoute allowedRoles={["admin"]}>
+                <AdminLayout>
+                  <PendingOrganizations />
+                </AdminLayout>
+              </RoleRoute>
+            } />
+            <Route path="/admin/moderation" element={
+              <RoleRoute allowedRoles={["admin"]}>
+                <AdminLayout>
+                  <ModerationQueue />
+                </AdminLayout>
+              </RoleRoute>
+            } />
+            <Route path="/notifications" element={
+              <ProtectedRoute>
+                <RoleAwareLayout>
+                  <Notifications />
+                </RoleAwareLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <StudentLayout>
+                  <AccountSettings />
+                </StudentLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/saved" element={
+              <ProtectedRoute>
+                <StudentLayout>
+                  <Saved />
+                </StudentLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/events/:eventId/feedback" element={
+              <ProtectedRoute>
+                <StudentLayout>
+                  <Feedback />
+                </StudentLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/search" element={
               <StudentLayout>
-                <Feedback />
+                <SearchResults />
               </StudentLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/search" element={
-            <StudentLayout>
-              <SearchResults />
-            </StudentLayout>
-          } />
-        </Routes>
+            } />
+          </Routes>
+        </NotificationsProvider>
       </AuthProvider>
     </BrowserRouter>
   );

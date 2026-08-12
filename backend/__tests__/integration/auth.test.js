@@ -1,8 +1,14 @@
 const request = require("supertest");
+const bcrypt = require("bcryptjs");
 const app = require("../../app");
 const pool = require("../../db");
 
 afterAll(async () => {
+  const restoredHash = await bcrypt.hash("organizer123", 10);
+  await pool.query(
+    'UPDATE "user" SET password_hash = $1 WHERE email = $2',
+    [restoredHash, "organizer@studenthub.test"]
+  );
   await pool.end();
 });
 

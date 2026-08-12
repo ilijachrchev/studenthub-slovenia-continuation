@@ -31,6 +31,7 @@ async function resetSequences(knex) {
 
 module.exports = async function globalSetup() {
   const knexConfig = require("../knexfile").test;
+  knexConfig.connection.database = TEST_DB;
   const knex = Knex(knexConfig);
 
   try {
@@ -47,7 +48,7 @@ module.exports = async function globalSetup() {
 
       // Drop and recreate test database
       await client.query(`DROP DATABASE IF EXISTS ${TEST_DB}`);
-      await client.query(`CREATE DATABASE ${TEST_DB}`);
+      await client.query(`CREATE DATABASE ${TEST_DB} TEMPLATE template0`);
 
       await client.end();
     }

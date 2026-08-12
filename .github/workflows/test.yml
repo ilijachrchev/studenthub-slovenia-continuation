@@ -15,7 +15,7 @@ jobs:
         image: postgres:15
         env:
           POSTGRES_USER: studenti
-          POSTGRES_PASSWORD: password
+          POSTGRES_PASSWORD: studenti_password
           POSTGRES_DB: studenthub_test
         ports:
           - 5432:5432
@@ -44,7 +44,7 @@ jobs:
           DB_HOST: localhost
           DB_PORT: 5432
           DB_USER: studenti
-          DB_PASSWORD: password
+          DB_PASSWORD: studenti_password
           DB_NAME: studenthub_test
           SESSION_SECRET: test-secret
           NODE_ENV: test

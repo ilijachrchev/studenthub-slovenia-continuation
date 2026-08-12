@@ -1,6 +1,7 @@
 const { Client } = require("pg");
 
 const TEST_DB = "studenthub_test";
+const PREPARED = process.env.TEST_DB_ALREADY_PREPARED === "true";
 const ROOT_CONFIG = {
   host: process.env.DB_HOST || "localhost",
   port: parseInt(process.env.DB_PORT || "5433", 10),
@@ -10,6 +11,10 @@ const ROOT_CONFIG = {
 };
 
 module.exports = async function globalTeardown() {
+  if (PREPARED) {
+    return;
+  }
+
   const client = new Client(ROOT_CONFIG);
   await client.connect();
 

@@ -7,6 +7,59 @@ on:
     branches: [dev, main]
 
 jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    env:
+      DB_CLIENT: pg
+      DB_HOST: localhost
+      DB_PORT: 5433
+      DB_USER: studenti
+      DB_PASSWORD: studentipass
+      DB_DATABASE: studenthub_test
+      TEST_DB_ALREADY_PREPARED: true
+      SESSION_SECRET: test-secret
+      NODE_ENV: test
+      FRONTEND_URL: http://localhost:30010
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: studenthub_test
+          POSTGRES_USER: studenti
+          POSTGRES_PASSWORD: studentipass
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd="pg_isready -U studenti -d SISIII2026_89241041"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Run database migrations
+        run: npm run db:migrate
+        working-directory: backend
+
+      - name: Run database seeds
+        run: npm run db:seed
+        working-directory: backend
+
+      - name: Run backend tests
+        run: npm test -- --runInBand
+        working-directory: backend
+
   frontend-build:
     runs-on: ubuntu-latest
 

@@ -1,0 +1,71 @@
+.page-state,
+.inline-state {
+  border: 1px solid #dbe3ec;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(3, 4, 94, 0.05);
+}
+
+.page-state {
+  padding: 24px;
+  display: grid;
+  gap: 12px;
+  min-height: 160px;
+  align-content: center;
+}
+
+.page-state-loading {
+  color: #475467;
+}
+
+.page-state-error {
+  border-color: #fecdca;
+  background: #fffafa;
+}
+
+.page-state-empty {
+  color: #475467;
+}
+
+.page-state-success {
+  border-color: #b7ebc6;
+  background: #f6fff7;
+}
+
+.page-state-title {
+  font-size: 20px;
+  margin: 0;
+  color: #101828;
+}
+
+.page-state-message {
+  color: #475467;
+}
+
+.page-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.inline-state {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.inline-state-error {
+  border-color: #fecdca;
+  background: #fffafa;
+}
+
+.inline-state-loading {
+  border-color: #dbe3ec;
+  background: #f8fafc;
+}
+
+.inline-state-success {
+  border-color: #b7ebc6;
+  background: #f6fff7;
+}

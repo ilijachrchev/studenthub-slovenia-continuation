@@ -41,12 +41,12 @@ describe("ProtectedRoute", () => {
   test("renders nothing while loading", () => {
     useAuth.mockReturnValue({ user: null, loading: true });
 
-    const { container } = renderWithRouter(
+    renderWithRouter(
       <ProtectedRoute>
         <div>Protected Content</div>
       </ProtectedRoute>
     );
 
-    expect(container.innerHTML).toBe("");
+    expect(screen.getByRole("status")).toHaveTextContent("Loading session");
   });
 });

@@ -53,12 +53,12 @@ describe("RoleRoute", () => {
   test("renders nothing while loading", () => {
     useAuth.mockReturnValue({ user: null, loading: true });
 
-    const { container } = renderWithRouter(
+    renderWithRouter(
       <RoleRoute allowedRoles={["admin"]}>
         <div>Admin Content</div>
       </RoleRoute>
     );
 
-    expect(container.innerHTML).toBe("");
+    expect(screen.getByRole("status")).toHaveTextContent("Loading session");
   });
 });

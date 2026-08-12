@@ -6,8 +6,8 @@ import RecommendationReason from "../../components/opportunities/RecommendationR
 import {
   dispatchAnalytics,
   normaliseOpportunityList,
-  unwrapMessage,
 } from "../../components/opportunities/opportunitiesUtils";
+import { getApiErrorMessage, requestJson } from "../../api/http";
 import "./css/opportunities.css";
 
 const PAGE_SIZE = 12;
@@ -50,22 +50,13 @@ function Discovery() {
         if (filters.search) params.set("search", filters.search);
         if (filters.deadline) params.set("deadline", filters.deadline);
 
-        const [opportunitiesRes, savedRes, recommendationsRes] = await Promise.all([
-          fetch(`/api/opportunities?${params.toString()}`, { credentials: "include" }),
-          fetch("/api/opportunities/saved/ids", { credentials: "include" }),
-          fetch("/api/recommendations", { credentials: "include" }),
+        const [opportunitiesData, savedData, recommendationsData] = await Promise.all([
+          requestJson(`/api/opportunities?${params.toString()}`),
+          requestJson("/api/opportunities/saved/ids"),
+          requestJson("/api/recommendations"),
         ]);
 
-        const opportunitiesData = await opportunitiesRes.json().catch(() => ({}));
-        const savedData = await savedRes.json().catch(() => ({}));
-        const recommendationsData = await recommendationsRes.json().catch(() => ({}));
-
         if (!alive) return;
-
-        if (!opportunitiesRes.ok) {
-          setError(unwrapMessage(opportunitiesData, "Failed to load opportunities"));
-          return;
-        }
 
         const nextItems = normaliseOpportunityList(opportunitiesData);
         setOpportunities(nextItems);
@@ -87,8 +78,8 @@ function Discovery() {
 
         const recItems = normaliseOpportunityList(recommendationsData);
         setRecommendations(recItems);
-      } catch {
-        if (alive) setError("Failed to load opportunities");
+      } catch (error) {
+        if (alive) setError(getApiErrorMessage(error, "Failed to load opportunities"));
       } finally {
         if (alive) setLoading(false);
       }
@@ -162,16 +153,14 @@ function Discovery() {
     });
 
     try {
-      const response = await fetch(`/api/opportunities/${opportunity.id}/bookmark`, {
+      await requestJson(`/api/opportunities/${opportunity.id}/bookmark`, {
         method: nextSaved ? "POST" : "DELETE",
-        credentials: "include",
       });
-
-      if (!response.ok) {
-        throw new Error("bookmark-failed");
-      }
-    } catch {
+    } catch (error) {
       setSavedIds(previous);
+      if (error?.status !== 409) {
+        setError(getApiErrorMessage(error, "Failed to update bookmark"));
+      }
     } finally {
       pendingBookmarkRef.current.delete(opportunity.id);
     }
@@ -193,15 +182,7 @@ function Discovery() {
       if (filters.search) params.set("search", filters.search);
       if (filters.deadline) params.set("deadline", filters.deadline);
 
-      const response = await fetch(`/api/opportunities?${params.toString()}`, {
-        credentials: "include",
-      });
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        setError(unwrapMessage(data, "Failed to load more opportunities"));
-        return;
-      }
+      const data = await requestJson(`/api/opportunities?${params.toString()}`);
 
       const nextItems = normaliseOpportunityList(data);
       setOpportunities((current) => [...current, ...nextItems]);
@@ -209,8 +190,8 @@ function Discovery() {
       setHasMore(
         Boolean(data.hasMore ?? data.has_more ?? data.nextPage ?? nextItems.length >= PAGE_SIZE)
       );
-    } catch {
-      setError("Failed to load more opportunities");
+    } catch (error) {
+      setError(getApiErrorMessage(error, "Failed to load more opportunities"));
     } finally {
       setLoadingMore(false);
     }

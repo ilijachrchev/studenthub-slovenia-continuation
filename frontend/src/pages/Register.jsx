@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "./css/Register.css";
 import { GraduationCap, Building, CheckCircle, ChevronRight } from "../components/reusable/Icons";
+import { getApiErrorMessage, requestJson } from "../api/http";
 
 function Register() {
   const navigate = useNavigate();
@@ -19,25 +20,16 @@ function Register() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/register", {
+      await requestJson("/api/auth/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           first_name: firstName,
           last_name: lastName,
           email,
           password,
           role,
-        }),
+        },
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error);
-        setLoading(false);
-        return;
-      }
 
       if (role === "organizer") {
         navigate("/setup-organization");
@@ -45,8 +37,8 @@ function Register() {
         navigate("/setup-feed");
       }
     } catch (err) {
-      void err;
-      setError("Something went wrong. Please try again.");
+      setError(getApiErrorMessage(err, "Something went wrong. Please try again."));
+    } finally {
       setLoading(false);
     }
   };

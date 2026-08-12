@@ -4,6 +4,7 @@ import { Wave } from "../components/reusable/Icons";
 import EventList from "../components/home/EventList";
 import HomeHero from "../components/home/HomeHero";
 import HomeFilters from "../components/home/HomeFilters";
+import { getApiErrorMessage, requestJson } from "../api/http";
 import "./css/Home.css";
 
 function Home() {
@@ -20,50 +21,50 @@ function Home() {
   const [savedIds, setSavedIds] = useState([]);
 
   useEffect(() => {
+    let alive = true;
     async function loadEvents() {
       try {
-        const [eventsRes, tagsRes, savedRes] = await Promise.all([
-          fetch("/api/events?page=1&limit=20", { credentials: "include" }),
-          fetch("/api/tags"),
-          fetch("/api/bookmarks/ids", {credentials: "include"}),
+        const [eventsData, tagsData, savedData] = await Promise.all([
+          requestJson("/api/events?page=1&limit=20"),
+          requestJson("/api/tags"),
+          requestJson("/api/bookmarks/ids"),
         ]);
 
-        const eventsData = await eventsRes.json();
-        const tagsData = await tagsRes.json();
-        const savedData = await savedRes.json();
+        if (!alive) return;
 
-        if (!eventsRes.ok) {
-          setError(eventsData.error || "Failed to load events");
-        } else {
-          setEvents(eventsData.events || []);
-          setHasMore(eventsData.events.length < eventsData.total);
-          setPage(1);
-          setTags(Array.isArray(tagsData) ? tagsData : []);
-          setSavedIds(savedData.ids || []);
-        }
-      } catch {
-        setError("Failed to load events");
-      } finally {
-        setLoading(false);
+        const nextEvents = eventsData.events || [];
+        setEvents(nextEvents);
+        setHasMore(nextEvents.length < (eventsData.total || nextEvents.length));
+        setPage(1);
+        setTags(Array.isArray(tagsData) ? tagsData : []);
+        setSavedIds(savedData.ids || []);
+      }
+      catch (err) {
+        if (!alive) return;
+        setError(getApiErrorMessage(err, "Failed to load events"));
+      }
+      finally {
+        if (alive) setLoading(false);
       }
     }
 
     loadEvents();
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const loadMore = async () => {
     const nextPage = page + 1;
     setLoadingMore(true);
     try {
-      const res = await fetch(`/api/events?page=${nextPage}&limit=20`, { credentials: "include" });
-      const data = await res.json();
-      if (res.ok) {
-        setEvents((prev) => [...prev, ...(data.events || [])]);
-        setPage(nextPage);
-        setHasMore(data.events.length > 0 && (nextPage * 20) < data.total);
-      }
-    } catch {
-      // silently fail — existing events remain
+      const data = await requestJson(`/api/events?page=${nextPage}&limit=20`);
+      setEvents((prev) => [...prev, ...(data.events || [])]);
+      setPage(nextPage);
+      setHasMore((data.events || []).length > 0 && (nextPage * 20) < (data.total || 0));
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to load more events"));
     } finally {
       setLoadingMore(false);
     }
@@ -71,25 +72,19 @@ function Home() {
 
   const handleToggleSave = async (eventId) => {
     const isSaved = savedIds.includes(eventId);
-    setSavedIds((prev) => 
+    setSavedIds((prev) =>
       isSaved ? prev.filter((id) => id !== eventId) : [...prev, eventId]
     );
 
     try {
-      const res = await fetch(`/api/bookmarks/${eventId}`, {
+      await requestJson(`/api/bookmarks/${eventId}`, {
         method: isSaved ? "DELETE" : "POST",
-        credentials: "include",
       });
-
-      if (!res.ok) {
-        setSavedIds((prev) =>
-          isSaved ? [...prev, eventId] : prev.filter((id) => id !== eventId)
-        );
-      }
-    } catch {
+    } catch (err) {
       setSavedIds((prev) =>
         isSaved ? [...prev, eventId] : prev.filter((id) => id !== eventId)
       );
+      setError(getApiErrorMessage(err, "Failed to update bookmark"));
     }
   };
 

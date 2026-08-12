@@ -4,6 +4,7 @@ import EventBasicDetails from "../../components/organizer/EventBasicDetails";
 import EventTimeLocation from "../../components/organizer/EventTimeLocation";
 import EventRegistrationType from "../../components/organizer/EventRegistrationType";
 import ChipMultiSelect from "../../components/organizer/ChipMultiSelect";
+import { getApiErrorMessage, requestJson } from "../../api/http";
 import "./css/CreateEvent.css";
 
 function CreateEvent() {
@@ -29,14 +30,14 @@ function CreateEvent() {
     useEffect(() => {
         async function loadData() {
             try {
-                const [facultiesRes, tagsRes] = await Promise.all([
-                    fetch("/api/faculties"),
-                    fetch("/api/tags"),
+                const [facultiesData, tagsData] = await Promise.all([
+                    requestJson("/api/faculties"),
+                    requestJson("/api/tags"),
                 ]);
-                setFaculties(await facultiesRes.json());
-                setTags(await tagsRes.json());
-            } catch {
-                setError("Failed to load faculties and tags");
+                setFaculties(facultiesData);
+                setTags(tagsData);
+            } catch (error) {
+                setError(getApiErrorMessage(error, "Failed to load faculties and tags"));
             }
         }
         loadData();
@@ -74,11 +75,9 @@ function CreateEvent() {
         
     const createEvent = async () => {
         try {
-            const res = await fetch("/api/organizer/events", {
+            const data = await requestJson("/api/organizer/events", {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
-                credentials: "include",
-                body: JSON.stringify({
+                body: {
                     title, description, location,
                     start_datetime: startDatetime,
                     end_datetime: endDatetime,
@@ -87,19 +86,11 @@ function CreateEvent() {
                     external_url: registrationType === "external" ? externalUrl : null,
                     tag_ids: selectedTags,
                     target_faculty_ids: selectedFaculties,
-                }),
+                },
             });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                setError(data.error || "Failed to create event");
-                return null;
-            }
-
             return data.eventId;
-        } catch {
-            setError("Something went wrong. Please try again.");
+        } catch (error) {
+            setError(getApiErrorMessage(error, "Something went wrong. Please try again."));
             return null;
         }
     };
@@ -129,19 +120,12 @@ function CreateEvent() {
         }
 
         try {
-            const res = await fetch(`/api/organizer/events/${id}/submit`, {
+            await requestJson(`/api/organizer/events/${id}/submit`, {
                 method: "POST",
-                credentials: "include",
             });
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.error || "Created as draft, but coudn't submit it");
-                setLoading(false);
-                return;
-            }
             navigate("/organizer");
-        } catch {
-            setError("Created as draft, but coulnd't submit it");
+        } catch (error) {
+            setError(getApiErrorMessage(error, "Created as draft, but couldn't submit it"));
             setLoading(false);
         }
     };

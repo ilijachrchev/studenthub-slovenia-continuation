@@ -5,8 +5,8 @@ import {
   formatDateTime,
   normaliseApplication,
   toArray,
-  unwrapMessage,
 } from "../../components/opportunities/opportunitiesUtils";
+import { getApiErrorMessage, requestJson } from "../../api/http";
 import "./css/opportunities.css";
 
 function MyApplications() {
@@ -19,21 +19,13 @@ function MyApplications() {
 
     async function loadApplications() {
       try {
-        const response = await fetch("/api/opportunities/applications", {
-          credentials: "include",
-        });
-        const data = await response.json().catch(() => ({}));
+        const data = await requestJson("/api/opportunities/applications");
 
         if (!alive) return;
 
-        if (!response.ok) {
-          setError(unwrapMessage(data, "Failed to load your applications"));
-          return;
-        }
-
         setApplications(toArray(data.applications || data.items || data).map(normaliseApplication));
-      } catch {
-        if (alive) setError("Failed to load your applications");
+      } catch (error) {
+        if (alive) setError(getApiErrorMessage(error, "Failed to load your applications"));
       } finally {
         if (alive) setLoading(false);
       }
@@ -60,16 +52,12 @@ function MyApplications() {
     );
 
     try {
-      const response = await fetch(`/api/opportunities/${application.opportunityId}/apply`, {
+      await requestJson(`/api/opportunities/${application.opportunityId}/apply`, {
         method: "DELETE",
-        credentials: "include",
       });
-
-      if (!response.ok) {
-        throw new Error("withdraw-failed");
-      }
-    } catch {
+    } catch (error) {
       setApplications(previous);
+      setError(getApiErrorMessage(error, "Failed to withdraw application"));
     }
   };
 

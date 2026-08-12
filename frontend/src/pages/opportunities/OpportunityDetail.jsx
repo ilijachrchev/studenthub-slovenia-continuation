@@ -8,9 +8,9 @@ import {
   isPastDate,
   normaliseOpportunity,
   normaliseOpportunityList,
-  unwrapMessage,
 } from "../../components/opportunities/opportunitiesUtils";
 import { useAuth } from "../../context/AuthContext";
+import { getApiErrorMessage, requestJson } from "../../api/http";
 import "./css/opportunities.css";
 
 function OpportunityDetail() {
@@ -32,22 +32,13 @@ function OpportunityDetail() {
 
     async function loadOpportunity() {
       try {
-        const [detailRes, relatedRes, savedRes] = await Promise.all([
-          fetch(`/api/opportunities/${id}`, { credentials: "include" }),
-          fetch(`/api/opportunities/${id}/related`, { credentials: "include" }),
-          fetch("/api/opportunities/saved/ids", { credentials: "include" }),
+        const [detailData, relatedData, savedData] = await Promise.all([
+          requestJson(`/api/opportunities/${id}`),
+          requestJson(`/api/opportunities/${id}/related`),
+          requestJson("/api/opportunities/saved/ids"),
         ]);
 
-        const detailData = await detailRes.json().catch(() => ({}));
-        const relatedData = await relatedRes.json().catch(() => ({}));
-        const savedData = await savedRes.json().catch(() => ({}));
-
         if (!alive) return;
-
-        if (!detailRes.ok) {
-          setError(unwrapMessage(detailData, "Failed to load opportunity"));
-          return;
-        }
 
         const item = normaliseOpportunity(detailData.opportunity ?? detailData);
         setOpportunity(item);
@@ -62,8 +53,8 @@ function OpportunityDetail() {
           opportunityId: item.id,
           title: item.title,
         });
-      } catch {
-        if (alive) setError("Failed to load opportunity");
+      } catch (error) {
+        if (alive) setError(getApiErrorMessage(error, "Failed to load opportunity"));
       } finally {
         if (alive) setLoading(false);
       }
@@ -89,16 +80,12 @@ function OpportunityDetail() {
     });
 
     try {
-      const response = await fetch(`/api/opportunities/${opportunity.id}/bookmark`, {
+      await requestJson(`/api/opportunities/${opportunity.id}/bookmark`, {
         method: nextSaved ? "POST" : "DELETE",
-        credentials: "include",
       });
-
-      if (!response.ok) {
-        throw new Error("save-failed");
-      }
-    } catch {
+    } catch (error) {
       setSaved(!nextSaved);
+      setError(getApiErrorMessage(error, "Failed to update bookmark"));
     }
   };
 
@@ -134,37 +121,39 @@ function OpportunityDetail() {
     setError("");
 
     try {
-      const response = await fetch(`/api/opportunities/${opportunity.id}/apply`, {
+      const data = await requestJson(`/api/opportunities/${opportunity.id}/apply`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ cover_note: coverNote, coverNote }),
+        body: { cover_note: coverNote, coverNote },
       });
-      const data = await response.json().catch(() => ({}));
-
-      if (response.status === 401 || response.status === 403) {
-        navigate(`/login?next=${encodeURIComponent(`/opportunities/${opportunity.id}`)}`);
-        return;
-      }
-
-      if (response.status === 409 || data.alreadyApplied) {
-        setApplyState("applied");
-        setError("You have already applied for this opportunity.");
-        return;
-      }
-
-      if (!response.ok) {
-        setError(unwrapMessage(data, "Failed to submit application"));
-        return;
-      }
 
       setApplyState(data.status || "submitted");
       dispatchAnalytics("opportunity_applied", {
         opportunityId: opportunity.id,
         title: opportunity.title,
       });
-    } catch {
-      setError("Failed to submit application");
+    } catch (error) {
+      if (error?.status === 401) {
+        navigate(`/login?next=${encodeURIComponent(`/opportunities/${opportunity.id}`)}`);
+        return;
+      }
+      if (error?.status === 403) {
+        setError("You do not have permission to apply for this opportunity.");
+        return;
+      }
+      if (error?.status === 409) {
+        setApplyState("applied");
+        setError("You have already applied for this opportunity.");
+        return;
+      }
+      if (error?.status === 422) {
+        setError(getApiErrorMessage(error, "Please check the application note and try again."));
+        return;
+      }
+      if (error?.status === 429) {
+        setError("Too many attempts. Please wait and try again.");
+        return;
+      }
+      setError(getApiErrorMessage(error, "Failed to submit application"));
     } finally {
       setApplying(false);
     }

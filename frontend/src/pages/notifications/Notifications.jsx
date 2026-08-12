@@ -3,9 +3,9 @@ import {
   formatDateTime,
   normaliseNotification,
   toArray,
-  unwrapMessage,
 } from "../../components/opportunities/opportunitiesUtils";
 import ApplicationStatusBadge from "../../components/opportunities/ApplicationStatusBadge";
+import { getApiErrorMessage, requestJson } from "../../api/http";
 import "./../opportunities/css/opportunities.css";
 
 const DEFAULT_PREFERENCES = {
@@ -26,27 +26,20 @@ function Notifications() {
 
     async function loadNotifications() {
       try {
-        const [listRes, prefsRes] = await Promise.all([
-          fetch("/api/notifications", { credentials: "include" }),
-          fetch("/api/notifications/preferences", { credentials: "include" }),
+        const [listData, prefsData] = await Promise.all([
+          requestJson("/api/notifications"),
+          requestJson("/api/notifications/preferences"),
         ]);
-        const listData = await listRes.json().catch(() => ({}));
-        const prefsData = await prefsRes.json().catch(() => ({}));
 
         if (!alive) return;
-
-        if (!listRes.ok) {
-          setError(unwrapMessage(listData, "Failed to load notifications"));
-          return;
-        }
 
         setNotifications(toArray(listData.notifications || listData.items || listData).map(normaliseNotification));
         setPreferences((current) => ({
           ...current,
           ...(prefsData.preferences || prefsData),
         }));
-      } catch {
-        if (alive) setError("Failed to load notifications");
+      } catch (error) {
+        if (alive) setError(getApiErrorMessage(error, "Failed to load notifications"));
       } finally {
         if (alive) setLoading(false);
       }
@@ -62,20 +55,15 @@ function Notifications() {
   useEffect(() => {
     const timer = setInterval(async () => {
       try {
-        const response = await fetch("/api/notifications?unread=1", {
-          credentials: "include",
-        });
-        const data = await response.json().catch(() => ({}));
-        if (response.ok) {
-          const unreadIds = new Set(
-            toArray(data.notifications || data.items || data).map((notification) =>
-              String(notification.id ?? notification.notification_id)
-            )
-          );
-          setNotifications((current) =>
-            current.map((item) => ({ ...item, unread: unreadIds.has(String(item.id)) }))
-          );
-        }
+        const data = await requestJson("/api/notifications?unread=1");
+        const unreadIds = new Set(
+          toArray(data.notifications || data.items || data).map((notification) =>
+            String(notification.id ?? notification.notification_id)
+          )
+        );
+        setNotifications((current) =>
+          current.map((item) => ({ ...item, unread: unreadIds.has(String(item.id)) }))
+        );
       } catch (error) {
         void error;
       }
@@ -92,15 +80,14 @@ function Notifications() {
     );
 
     try {
-      const response = await fetch(`/api/notifications/${notification.id}/read`, {
+      await requestJson(`/api/notifications/${notification.id}/read`, {
         method: "POST",
-        credentials: "include",
       });
-      if (!response.ok) throw new Error("read-failed");
-    } catch {
+    } catch (error) {
       setNotifications((current) =>
         current.map((item) => (item.id === notification.id ? { ...item, unread: true } : item))
       );
+      setError(getApiErrorMessage(error, "Failed to mark notification read"));
     }
   };
 
@@ -109,13 +96,12 @@ function Notifications() {
     setNotifications((current) => current.map((item) => ({ ...item, unread: false })));
 
     try {
-      const response = await fetch("/api/notifications/read-all", {
+      await requestJson("/api/notifications/read-all", {
         method: "POST",
-        credentials: "include",
       });
-      if (!response.ok) throw new Error("read-all-failed");
-    } catch {
+    } catch (error) {
       setNotifications(previous);
+      setError(getApiErrorMessage(error, "Failed to mark all notifications read"));
     }
   };
 
@@ -125,15 +111,13 @@ function Notifications() {
     setSavingPreferences(true);
 
     try {
-      const response = await fetch("/api/notifications/preferences", {
+      await requestJson("/api/notifications/preferences", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(nextPreferences),
+        body: nextPreferences,
       });
-      if (!response.ok) throw new Error("prefs-failed");
-    } catch {
+    } catch (error) {
       setPreferences((current) => ({ ...current, [key]: preferences[key] }));
+      setError(getApiErrorMessage(error, "Failed to save notification preferences"));
     } finally {
       setSavingPreferences(false);
     }

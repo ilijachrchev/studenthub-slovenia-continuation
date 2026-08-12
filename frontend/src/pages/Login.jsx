@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { GraduationCap } from "../components/reusable/Icons";
 import "./css/Login.css";
 import { useAuth } from "../context/AuthContext";
+import { getApiErrorMessage, requestJson } from "../api/http";
 
 function Login() {
   const navigate = useNavigate();
@@ -19,27 +20,17 @@ function Login() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const data = await requestJson("/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json"},
-        body: JSON.stringify({email, password}),
+        body: { email, password },
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error);
-        setLoading(false);
-        return;
-      }
-
       await refreshUser();
 
       const role = data.user.role;
       navigate(role === "organizer" ? "/organizer" : role === "admin" ? "/admin" : "/");
     } catch (error) {
-      void error;
-      setError("Something went wrong. Please try again!")
+      setError(getApiErrorMessage(error, "Something went wrong. Please try again!"));
+    } finally {
       setLoading(false);
     }
   };

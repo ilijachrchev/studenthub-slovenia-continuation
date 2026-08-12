@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import PendingOrgCard from "../../components/admin/PendingOrgCard";
+import { getApiErrorMessage, requestJson } from "../../api/http";
 import "./css/PendingOrganizations.css";
 
 function PendingOrganizations() {
@@ -8,23 +9,16 @@ function PendingOrganizations() {
     const [error, setError] = useState("");
 
     const loadPending = useCallback(async () => {
-        const res = await fetch("/api/admin/organizations/pending", {credentials: "include"});
-        if (!res.ok) {
-            const data = await res.json();
-            setError(data.error || "Failed to load pending organizations");
-            return;
-        }
-
-        const data = await res.json();
-        setOrganizations(data.organizations);
+        const data = await requestJson("/api/admin/organizations/pending");
+        setOrganizations(data.organizations || []);
     }, []);
 
     useEffect(() => {
         async function init() {
             try {
                 await loadPending();
-            } catch {
-                setError("Something went wrong. Please try again");
+            } catch (error) {
+                setError(getApiErrorMessage(error, "Something went wrong. Please try again"));
             } finally {
                 setLoading(false);
             }
@@ -35,36 +29,24 @@ function PendingOrganizations() {
     const handleApprove = async (id) => {
         setError("");
         try {
-            const res = await fetch(`/api/admin/organizations/${id}/approve`, {
+            await requestJson(`/api/admin/organizations/${id}/approve`, {
                 method: "POST",
-                credentials: "include",
             });
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.error || "Failed to approve organizatio");
-                return;
-            }
             await loadPending();
-        } catch {
-            setError("Something wen wrong. Please try again");
+        } catch (error) {
+            setError(getApiErrorMessage(error, "Something wen wrong. Please try again"));
         }
     };
 
     const handleReject = async (id) => {
         setError("");
         try {
-            const res = await fetch(`/api/admin/organizations/${id}/reject`, {
+            await requestJson(`/api/admin/organizations/${id}/reject`, {
                 method: "POST",
-                credentials: "include",
             });
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.error || "Failed to reject organization.");
-                return;
-            }
             await loadPending();
-        } catch {
-            setError("Something went wrong. Please try again");
+        } catch (error) {
+            setError(getApiErrorMessage(error, "Something went wrong. Please try again"));
         }
     };
 

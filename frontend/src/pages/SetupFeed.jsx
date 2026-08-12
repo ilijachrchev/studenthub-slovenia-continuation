@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { GraduationCap } from "../components/reusable/Icons";
 import "./css/SetupFeed.css";
 import { useAuth } from "../context/AuthContext";
+import { getApiErrorMessage, requestJson } from "../api/http";
 
 
 function SetupFeed() {
@@ -23,14 +24,14 @@ function SetupFeed() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [facultiesRes, tagsRes] = await Promise.all([
-          fetch('/api/faculties'),
-          fetch('/api/tags')
+        const [facultiesData, tagsData] = await Promise.all([
+          requestJson('/api/faculties'),
+          requestJson('/api/tags')
         ]);
-        setFaculties(await facultiesRes.json());
-        setTags(await tagsRes.json());
-      } catch {
-        setError('Failed to load faculties and tags');
+        setFaculties(facultiesData);
+        setTags(tagsData);
+      } catch (error) {
+        setError(getApiErrorMessage(error, 'Failed to load faculties and tags'));
       }
     }
     loadData();
@@ -51,29 +52,19 @@ function SetupFeed() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/student/setup", {
+      await requestJson("/api/student/setup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
+        body: {
           faculty_id: Number(facultyId),
           study_year: studyYear ? Number(studyYear) : null,
           tag_ids: selectedTags
-        })
+        }
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || 'Failed to save preferences');
-        setLoading(false);
-        return;
-      }
-
       await refreshUser();
       navigate("/");
-    } catch {
-        setError('Failed to save preferences');
+    } catch (error) {
+        setError(getApiErrorMessage(error, 'Failed to save preferences'));
+    } finally {
         setLoading(false);
       }
     };

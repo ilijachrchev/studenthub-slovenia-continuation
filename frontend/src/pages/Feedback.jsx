@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Star } from "../components/reusable/Icons";
+import { getApiErrorMessage, requestJson } from "../api/http";
 import "./css/Feedback.css";
 
 function Feedback() {
@@ -19,18 +20,15 @@ function Feedback() {
   useEffect(() => {
     async function load() {
         try {
-            const [eventRes, feedbackRes] = await Promise.all([
-                fetch(`/api/events/${eventId}`, {credentials: "include"}),
-                fetch(`/api/feedback/${eventId}`, {credentials: "include"}),
+            const [eventData, feedbackData] = await Promise.all([
+                requestJson(`/api/events/${eventId}`),
+                requestJson(`/api/feedback/${eventId}`),
             ]);
 
-            const eventData = await eventRes.json();
-            const feedbackData = await feedbackRes.json();
-
-            if (eventRes.ok) setEvent(eventData);
+            setEvent(eventData);
             if (feedbackData.feedback) setExisting(feedbackData.feedback);
-        } catch {
-            setError("Failed to load this event");
+        } catch (error) {
+            setError(getApiErrorMessage(error, "Failed to load this event"));
         } finally {
             setLoading(false);
         }
@@ -47,23 +45,14 @@ function Feedback() {
 
     setSubmitting(true);
     try {
-        const res = await fetch(`/api/feedback/${eventId}`, {
+        await requestJson(`/api/feedback/${eventId}`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ rating, comment: comment.trim() || null}),
+            body: { rating, comment: comment.trim() || null },
         });
-
-        const data = await res.json();
-        if (!res.ok) {
-            setError(data.error || "Failed to submit feedback");
-            setSubmitting(false);
-            return;
-        }
         setDone(true);
-        setSubmitting(false);
-    } catch {
-        setError("Failed to submit feedback");
+    } catch (error) {
+        setError(getApiErrorMessage(error, "Failed to submit feedback"));
+    } finally {
         setSubmitting(false);
     }
   };

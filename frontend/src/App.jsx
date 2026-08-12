@@ -23,6 +23,11 @@ import { AuthProvider } from "./context/AuthContext";
 import MyRegistrations from "./pages/MyRegistrations";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import RoleRoute from "./components/auth/RoleRoute";
+import Discovery from "./pages/opportunities/Discovery";
+import OpportunityDetail from "./pages/opportunities/OpportunityDetail";
+import MyApplications from "./pages/opportunities/MyApplications";
+import SavedOpportunities from "./pages/opportunities/SavedOpportunities";
+import Notifications from "./pages/notifications/Notifications";
 
 
 export default function App() {
@@ -63,10 +68,41 @@ export default function App() {
               <OrganizationProfile />
             </StudentLayout>  
           } />
+          <Route path="/opportunities" element={
+            <StudentLayout>
+              <Discovery />
+            </StudentLayout>
+          } />
+          <Route path="/opportunities/:id" element={
+            <StudentLayout>
+              <OpportunityDetail />
+            </StudentLayout>
+          } />
           <Route path="/my-registrations" element={
             <ProtectedRoute>
               <StudentLayout>
                 <MyRegistrations />
+              </StudentLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/my-applications" element={
+            <ProtectedRoute>
+              <StudentLayout>
+                <MyApplications />
+              </StudentLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/saved-opportunities" element={
+            <ProtectedRoute>
+              <StudentLayout>
+                <SavedOpportunities />
+              </StudentLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/notifications" element={
+            <ProtectedRoute>
+              <StudentLayout>
+                <Notifications />
               </StudentLayout>
             </ProtectedRoute>
           } />

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { getApiErrorMessage, requestJson } from "../../api/http";
 import "./css/OrganizerDashboard.css";
 
 const STATUS_GROUPS = [
@@ -27,30 +28,22 @@ function OrganizerDashboard() {
     const [error, setError] = useState("");
 
     const loadEvents = useCallback(async () => {
-        const res = await fetch("/api/organizer/events", { credentials: "include"});
-        if (!res.ok) {
-            const data = await res.json();
-            setError(data.error || "Failed to load events");
-            return;
+        const [organizationData, data] = await Promise.all([
+            requestJson("/api/organizations/my-application"),
+            requestJson("/api/organizer/events"),
+        ]);
+        if (organizationData.hasApplication) {
+            setOrganization(organizationData.organization);
         }
-        const data = await res.json();
-        setEvents(data.events);
+        setEvents(data.events || []);
     }, []);
 
     useEffect(() => {
         async function init() {
             try {
-                const orgRes = await fetch("/api/organizations/my-application", {credentials: "include"});
-                if (orgRes.ok) {
-                    const orgData = await orgRes.json();
-
-                    if (orgData.hasApplication) {
-                        setOrganization(orgData.organization);
-                    }
-                }
                 await loadEvents();
-            } catch {
-                setError("Something went wrong. Please try again.");
+            } catch (error) {
+                setError(getApiErrorMessage(error, "Something went wrong. Please try again."));
             } finally {
                 setLoading(false);
             }
@@ -60,19 +53,13 @@ function OrganizerDashboard() {
 
     const handleSubmit = async (eventId) => {
         try {
-            const res = await fetch(`/api/organizer/events/${eventId}/submit`, {
+            await requestJson(`/api/organizer/events/${eventId}/submit`, {
                 method: "POST",
-                credentials: "include",
             });
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.error || "Filaed to submit event");
-                return;
-            }
             setError("");
             await loadEvents();
-        } catch {
-            setError("Something went wrong. Please try again")
+        } catch (error) {
+            setError(getApiErrorMessage(error, "Something went wrong. Please try again"))
         }
     }
 

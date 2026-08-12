@@ -9,6 +9,7 @@ Every endpoint in the StudentHub Slovenia API: method, path, who can call it, th
 - **Auth is session-based.** Log in first; the cookie is then sent on every following request. To test logged-out behavior, clear the `connect.sid` cookie or use a fresh tab.
 - Send bodies as **raw JSON** (`Content-Type: application/json`).
 - Body keys are `snake_case`.
+- For local backend tests, use the PostgreSQL service from `docker-compose.yml` or any equivalent instance that exposes `studenti / studentipass` on `localhost:5433` and lets the test database `studenthub_test` be created. The Jest global setup runs the migrations and seeds automatically before the integration suite.
 
 ---
 

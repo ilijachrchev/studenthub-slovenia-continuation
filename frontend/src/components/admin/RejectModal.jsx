@@ -5,23 +5,34 @@ function RejectModal({event, onCancel, onConfirm, loading}) {
 
     return (
         <div className="modal-overlay" onClick={onCancel}>
-            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-                <h3>Reject "{event.title}"</h3>
+            <div
+                className="modal-card"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="reject-modal-title"
+                aria-describedby="reject-modal-description"
+            >
+                <h3 id="reject-modal-title">Reject "{event.title}"</h3>
                 <p className="modal-subtitle">
-                    Let the organizer know why, they will see this on their dashboard.
+                    Let the organizer know why. They will see this on their dashboard.
                 </p>
-                <textarea 
-                    className="input" 
+                <p id="reject-modal-description" className="modal-subtitle">
+                    Provide a concise explanation for the rejection decision.
+                </p>
+                <textarea
+                    className="input"
                     rows={4}
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    placeholder="Reason for rejection..."    
+                    placeholder="Reason for rejection..."
+                    aria-describedby="reject-modal-description"
                 />
                 <div className="modal-actions">
-                    <button className="btn-secondary" onClick={onCancel} disabled={loading}>
+                    <button type="button" className="btn-secondary" onClick={onCancel} disabled={loading}>
                         Cancel
                     </button>
-                    <button className="btn-reject" onClick={() => onConfirm(reason)} disabled={loading || !reason.trim()}>
+                    <button type="button" className="btn-reject" onClick={() => onConfirm(reason)} disabled={loading || !reason.trim()}>
                         {loading ? "Rejecting..." : "Reject Event"}
                     </button>
                 </div>

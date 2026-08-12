@@ -1,6 +1,6 @@
 function PendingOrgCard({ organization, onApprove, onReject }) {
     return (
-        <div className="pending-card">
+        <article className="pending-card">
             <div className="pending-card-body">
                 <h3>{organization.name}</h3>
 
@@ -27,14 +27,14 @@ function PendingOrgCard({ organization, onApprove, onReject }) {
             </div>
 
             <div className="pending-card-actions">
-                <button className="btn-approve" onClick={() => onApprove(organization.id)}>
+                <button type="button" className="btn-approve" onClick={() => onApprove(organization.id)}>
                     Approve
                 </button>
-                <button className="btn-reject" onClick={() => onReject(organization.id)}>
+                <button type="button" className="btn-reject" onClick={() => onReject(organization.id)}>
                     Reject
                 </button>
             </div>
-        </div>
+        </article>
     );
 }
 

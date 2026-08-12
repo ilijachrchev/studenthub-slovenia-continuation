@@ -10,7 +10,7 @@ function formatDateTime(value) {
 
 function PendingEventCard({ event, onApprove, onReject }) {
     return (
-        <div className="pending-card">
+        <article className="pending-card">
             <div className="pending-card-body">
                 <h3>{event.title}</h3>
 
@@ -26,14 +26,14 @@ function PendingEventCard({ event, onApprove, onReject }) {
             </div>
 
             <div className="pending-card-actions">
-                <button className="btn-approve" onClick={() => onApprove(event.id)}>
+                <button type="button" className="btn-approve" onClick={() => onApprove(event.id)}>
                     Approve
                 </button>
-                <button className="btn-reject" onClick={() => onReject(event)}>
+                <button type="button" className="btn-reject" onClick={() => onReject(event)}>
                     Reject
                 </button>
             </div>
-        </div>
+        </article>
     );
 }
 

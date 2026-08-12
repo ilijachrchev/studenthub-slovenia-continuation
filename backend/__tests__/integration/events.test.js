@@ -149,6 +149,35 @@ describe("POST /api/registrations/:id (event registration)", () => {
     expect(res.status).toBe(409);
   });
 
+  test("rejects registration when capacity is exhausted", async () => {
+    if (!publishedEventId) return;
+
+    const { rows: eventRows } = await pool.query(
+      "SELECT capacity FROM event WHERE id = $1",
+      [publishedEventId]
+    );
+    const originalCapacity = eventRows[0].capacity;
+
+    const agent = request.agent(app);
+    await agent
+      .post("/api/auth/login")
+      .send({ email: "student@famnit.upr.si", password: "student123" });
+
+    try {
+      await agent.delete(`/api/registrations/${publishedEventId}`);
+      await pool.query("UPDATE event SET capacity = 0 WHERE id = $1", [publishedEventId]);
+
+      const res = await agent.post(`/api/registrations/${publishedEventId}`);
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/full/i);
+    } finally {
+      await pool.query("UPDATE event SET capacity = $1 WHERE id = $2", [
+        originalCapacity,
+        publishedEventId,
+      ]);
+    }
+  });
+
   test("rejects unauthenticated registration", async () => {
     if (!publishedEventId) return;
 

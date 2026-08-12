@@ -254,6 +254,65 @@ describe("Migration lifecycle", () => {
     );
   });
 
+  test("updated_at is refreshed for opportunity rows", async () => {
+    await knex("opportunity").insert({
+      id: 9003,
+      organization_id: 9001,
+      title: "Opportunity Trigger Check",
+      description: "Created for opportunity timestamp validation",
+      location: "Koper",
+      deadline: "2026-10-12 10:00:00",
+      status: "draft",
+    }).onConflict("id").ignore();
+
+    const before = await knex("opportunity")
+      .select("updated_at")
+      .where({ id: 9003 })
+      .first();
+
+    await sleep(25);
+
+    await knex("opportunity")
+      .where({ id: 9003 })
+      .update({ description: "Opportunity trigger validation" });
+
+    const after = await knex("opportunity")
+      .select("updated_at")
+      .where({ id: 9003 })
+      .first();
+
+    expect(new Date(after.updated_at).getTime()).toBeGreaterThanOrEqual(
+      new Date(before.updated_at).getTime()
+    );
+  });
+
+  test("updated_at is refreshed for notification preferences rows", async () => {
+    await knex("notification_preferences").insert({
+      user_id: 9001,
+      preferences: knex.raw("?::jsonb", [JSON.stringify({ "application.received": true })]),
+    }).onConflict("user_id").ignore();
+
+    const before = await knex("notification_preferences")
+      .select("updated_at")
+      .where({ user_id: 9001 })
+      .first();
+
+    await sleep(25);
+
+    await knex("notification_preferences")
+      .where({ user_id: 9001 })
+      .update({ preferences: knex.raw("?::jsonb", [JSON.stringify({ "application.received": false })]) });
+
+    const after = await knex("notification_preferences")
+      .select("updated_at")
+      .where({ user_id: 9001 })
+      .first();
+
+    expect(new Date(after.updated_at).getTime()).toBeGreaterThanOrEqual(
+      new Date(before.updated_at).getTime()
+    );
+  });
+
   test("foreign keys cascade through opportunity/application deletion", async () => {
     await knex("user").insert({
       id: 9002,

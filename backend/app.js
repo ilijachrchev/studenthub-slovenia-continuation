@@ -94,6 +94,9 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/bookmarks", bookmarksRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/search", searchRoutes);
+app.use("/api", (req, res) => {
+    res.status(404).json({ error: "Not found" });
+});
 
 const reactBuildPath = path.join(__dirname, './dist');
 if (fs.existsSync(reactBuildPath)) {
@@ -109,7 +112,7 @@ app.use((err, req, res, _next) => {
     const status = err.status || err.statusCode;
     if (status) {
         logger.warn({ err: err.message }, "Client error");
-        return res.status(status).json({ error: err.message });
+        return res.status(status).json({ error: err.message || "Request failed" });
     }
     logger.error({ err: err.message }, "Unhandled middleware error");
     res.status(500).json({ error: "Internal server error" });

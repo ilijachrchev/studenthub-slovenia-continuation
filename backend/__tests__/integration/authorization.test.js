@@ -181,6 +181,7 @@ describe("API reliability", () => {
   test("returns JSON for unknown API routes", async () => {
     const res = await request(app).get("/api/nonexistent");
     expect(res.status).toBe(404);
+    expect(res.body.error).toBe("Not found");
   });
 
   test("health endpoint works without auth", async () => {

@@ -41,48 +41,67 @@ router.post("/:id", requireAuth, catchAsync(async (req, res) => {
     const userId = req.session.user.id;
     const eventId = req.params.id;
 
-    const { rows: eventRows } = await pool.query(
-      "SELECT id, capacity, registration_type, status FROM event WHERE id = $1",
-      [eventId]
-    );
+    const client = await pool.connect();
 
-    if (!eventRows.length || eventRows[0].status !== "published") {
-        return res.status(404).json({ error: "Event not found" });
-    }
-    const event = eventRows[0];
+    try {
+      await client.query("BEGIN");
 
-    if (event.registration_type !== "built_in") {
-      return res.status(400).json({ error: "This event does not use built-in registration" });
-    }
-
-    const { rows: existing } = await pool.query(
-      "SELECT id FROM registration WHERE user_id = $1 AND event_id = $2",
-      [userId, eventId]
-    );
-    if (existing.length) {
-      return res.status(409).json({error: "You are already registered for this event"})
-    }
-
-    if (event.capacity != null) {
-      const { rows: countRows } = await pool.query(
-        "SELECT COUNT(*)::int AS count FROM registration WHERE event_id = $1",
+      const { rows: eventRows } = await client.query(
+        "SELECT id, capacity, registration_type, status FROM event WHERE id = $1 FOR UPDATE",
         [eventId]
       );
-      if (countRows[0].count >= event.capacity) {
-        return res.status(409).json({error: "This event is full"});
+
+      if (!eventRows.length || eventRows[0].status !== "published") {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Event not found" });
       }
+
+      const event = eventRows[0];
+
+      if (event.registration_type !== "built_in") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "This event does not use built-in registration" });
+      }
+
+      const { rows: existing } = await client.query(
+        "SELECT id FROM registration WHERE user_id = $1 AND event_id = $2",
+        [userId, eventId]
+      );
+      if (existing.length) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({ error: "You are already registered for this event" });
+      }
+
+      if (event.capacity != null) {
+        const { rows: countRows } = await client.query(
+          "SELECT COUNT(*)::int AS count FROM registration WHERE event_id = $1",
+          [eventId]
+        );
+        if (countRows[0].count >= event.capacity) {
+          await client.query("ROLLBACK");
+          return res.status(409).json({ error: "This event is full" });
+        }
+      }
+
+      const ticketCode = generateTicketCode();
+      const { rows: [registration] } = await client.query(
+        `INSERT INTO registration (user_id, event_id, ticket_code)
+         VALUES ($1, $2, $3)
+         RETURNING id, user_id, event_id, registered_at, ticket_code, checked_in`,
+        [userId, eventId, ticketCode]
+      );
+
+      await client.query("COMMIT");
+      res.status(201).json(registration);
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (error.code === "23505") {
+        return res.status(409).json({ error: "You are already registered for this event" });
+      }
+      throw error;
+    } finally {
+      client.release();
     }
-
-    // insert with a generated ticket code
-    const ticketCode = generateTicketCode();
-    const { rows: [registration] } = await pool.query(
-      `INSERT INTO registration (user_id, event_id, ticket_code)
-       VALUES ($1, $2, $3)
-       RETURNING id, user_id, event_id, registered_at, ticket_code, checked_in`,
-      [userId, eventId, ticketCode]
-    );
-
-    res.status(201).json(registration);
 }));
 
 

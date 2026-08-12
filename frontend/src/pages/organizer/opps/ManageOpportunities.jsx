@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import OrganizerLayout from "../../../components/layout/OrganizerLayout";
 import OpportunityCard from "../../../components/organizer/opps/OpportunityCard";
 import OpportunityForm from "../../../components/organizer/opps/OpportunityForm";
 import StatusBadge from "../../../components/shared/StatusBadge";
+import PageState, { InlineState } from "../../../components/shared/PageState";
 import "./ManageOpportunities.css";
 
 const EMPTY_OPPORTUNITY = null;
@@ -30,9 +31,19 @@ function ManageOpportunities() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [selectedOpportunity, setSelectedOpportunity] = useState(EMPTY_OPPORTUNITY);
+  const errorRef = useRef(null);
+
+  useEffect(() => {
+    if (error && errorRef.current) {
+      errorRef.current.focus();
+    }
+  }, [error]);
 
   const loadOpportunities = useCallback(async () => {
+    setError("");
+    setLoading(true);
     const res = await fetch("/api/organizer/opportunities", { credentials: "include" });
     if (!res.ok) {
       const data = await safeJson(res);
@@ -76,6 +87,7 @@ function ManageOpportunities() {
   const saveOpportunity = async (payload) => {
     setSaving(true);
     setActionError("");
+    setSuccessMessage("");
     try {
       const isEdit = Boolean(selectedOpportunity?.id);
       const res = await fetch(isEdit ? `/api/organizer/opportunities/${selectedOpportunity.id}` : "/api/organizer/opportunities", {
@@ -91,6 +103,7 @@ function ManageOpportunities() {
       }
       await loadOpportunities();
       resetForm();
+      setSuccessMessage(isEdit ? "Opportunity updated." : "Opportunity created.");
     } catch {
       setActionError("Something went wrong. Please try again.");
     } finally {
@@ -100,6 +113,7 @@ function ManageOpportunities() {
 
   const runAction = async (opportunity, endpoint, method = "POST") => {
     setActionError("");
+    setSuccessMessage("");
     try {
       const res = await fetch(`/api/organizer/opportunities/${opportunity.id}/${endpoint}`, {
         method,
@@ -111,6 +125,12 @@ function ManageOpportunities() {
         return;
       }
       await loadOpportunities();
+      const successCopy = {
+        submit: "Opportunity submitted for review.",
+        close: "Opportunity closed.",
+        archive: "Opportunity archived.",
+      };
+      setSuccessMessage(successCopy[endpoint] || "Opportunity updated.");
     } catch {
       setActionError("Something went wrong. Please try again.");
     }
@@ -119,6 +139,7 @@ function ManageOpportunities() {
   const handleEdit = (opportunity) => {
     setSelectedOpportunity(opportunity);
     setActionError("");
+    setSuccessMessage("");
   };
 
   const handleSubmit = async (opportunity) => {
@@ -140,79 +161,103 @@ function ManageOpportunities() {
   };
 
   if (loading) {
-    return <p className="opp-status" role="status">Loading opportunities...</p>;
+    return (
+      <OrganizerLayout>
+        <PageState variant="loading" title="Loading opportunities" message="Fetching your draft and published opportunities." />
+      </OrganizerLayout>
+    );
   }
 
   if (error) {
     return (
-      <section className="opp-empty-state" role="alert">
-        <h1>Manage Opportunities</h1>
-        <p>{error}</p>
-      </section>
+      <OrganizerLayout>
+        <PageState
+          ref={errorRef}
+          variant="error"
+          title="Manage Opportunities"
+          message={error}
+          actionLabel="Retry"
+          onAction={loadOpportunities}
+        />
+      </OrganizerLayout>
     );
   }
 
   return (
     <OrganizerLayout>
       <div className="manage-opps-page">
-      <header className="manage-opps-header">
-        <div>
-          <h1>Manage Opportunities</h1>
-          <p>Draft, submit, close, and archive every opportunity you own.</p>
-        </div>
-        <button type="button" className="btn-primary btn-primary-inline" onClick={() => navigate("/organizer/opportunities/applicants")}>
-          Open applicants
-        </button>
-      </header>
-
-      {actionError && (
-        <div className="opp-inline-error" role="alert">
-          {actionError}
-        </div>
-      )}
-
-      <div className="manage-opps-grid">
-        <OpportunityForm
-          key={selectedOpportunity?.id || "new"}
-          opportunity={selectedOpportunity}
-          onSubmit={saveOpportunity}
-          onCancel={resetForm}
-          saving={saving}
-          serverError={actionError}
-        />
-
-        <section className="opp-list-panel" aria-labelledby="owned-opps-title">
-          <div className="opp-list-header">
-            <div>
-              <h2 id="owned-opps-title">Owned opportunities</h2>
-              <p>{sortedOpportunities.length} total</p>
-            </div>
-            <StatusBadge status="all" label="All statuses" />
+        <header className="manage-opps-header">
+          <div>
+            <h1>Manage Opportunities</h1>
+            <p>Draft, submit, close, and archive every opportunity you own.</p>
           </div>
+          <button type="button" className="btn-primary btn-primary-inline" onClick={() => navigate("/organizer/opportunities/applicants")}>
+            Open applicants
+          </button>
+        </header>
 
-          {sortedOpportunities.length === 0 ? (
-            <div className="opp-empty-list">
-              <p>No opportunities yet.</p>
+        {successMessage && (
+          <InlineState
+            variant="success"
+            message={successMessage}
+            onAction={() => setSuccessMessage("")}
+            actionLabel="Dismiss"
+          />
+        )}
+
+        {actionError && (
+          <InlineState
+            variant="error"
+            message={actionError}
+            actionLabel="Dismiss"
+            onAction={() => setActionError("")}
+          />
+        )}
+
+        <div className="manage-opps-grid">
+          <OpportunityForm
+            key={selectedOpportunity?.id || "new"}
+            opportunity={selectedOpportunity}
+            onSubmit={saveOpportunity}
+            onCancel={resetForm}
+            saving={saving}
+            serverError={actionError}
+          />
+
+          <section className="opp-list-panel" aria-labelledby="owned-opps-title">
+            <div className="opp-list-header">
+              <div>
+                <h2 id="owned-opps-title">Owned opportunities</h2>
+                <p>{sortedOpportunities.length} total</p>
+              </div>
+              <StatusBadge status="all" label="All statuses" />
             </div>
-          ) : (
-            <div className="opp-card-list">
-              {sortedOpportunities.map((opportunity) => (
-                <OpportunityCard
-                  key={opportunity.id}
-                  opportunity={opportunity}
-                  onEdit={handleEdit}
-                  onSubmit={handleSubmit}
-                  onClose={handleClose}
-                  onArchive={handleArchive}
-                  onViewApplicants={(item) => navigate(`/organizer/opportunities/${item.id}/applicants`)}
-                  onViewAnalytics={(item) => navigate(`/organizer/opportunities/${item.id}/analytics`)}
-                  busy={saving}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
+
+            {sortedOpportunities.length === 0 ? (
+              <PageState
+                variant="empty"
+                title="No opportunities yet"
+                message="Create a draft to start managing an opportunity from this dashboard."
+              />
+            ) : (
+              <div className="opp-card-list">
+                {sortedOpportunities.map((opportunity) => (
+                  <OpportunityCard
+                    key={opportunity.id}
+                    opportunity={opportunity}
+                    onEdit={handleEdit}
+                    onSubmit={handleSubmit}
+                    onClose={handleClose}
+                    onArchive={handleArchive}
+                    onViewApplicants={(item) => navigate(`/organizer/opportunities/${item.id}/applicants`)}
+                    onViewAnalytics={(item) => navigate(`/organizer/opportunities/${item.id}/analytics`)}
+                    busy={saving}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
       </div>
     </OrganizerLayout>
   );

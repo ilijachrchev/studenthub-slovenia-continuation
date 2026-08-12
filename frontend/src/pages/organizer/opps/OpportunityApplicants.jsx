@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import OrganizerLayout from "../../../components/layout/OrganizerLayout";
 import ApplicantList from "../../../components/organizer/opps/ApplicantList";
 import StatusBadge from "../../../components/shared/StatusBadge";
+import PageState, { InlineState } from "../../../components/shared/PageState";
 import "./OpportunityApplicants.css";
 
 function safeJson(res) {
@@ -34,6 +35,21 @@ function OpportunityApplicants() {
   const [pendingTransition, setPendingTransition] = useState(null);
   const [transitionNote, setTransitionNote] = useState("");
   const [transitionBusy, setTransitionBusy] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const detailRef = useRef(null);
+  const transitionRef = useRef(null);
+
+  useEffect(() => {
+    if (selectedApplicant && detailRef.current) {
+      detailRef.current.focus();
+    }
+  }, [selectedApplicant]);
+
+  useEffect(() => {
+    if (pendingTransition && transitionRef.current) {
+      transitionRef.current.focus();
+    }
+  }, [pendingTransition]);
 
   const selectedOpportunity = useMemo(
     () => opportunities.find((item) => String(item.id) === String(selectedOpportunityId)) || null,
@@ -41,6 +57,8 @@ function OpportunityApplicants() {
   );
 
   const loadOpportunities = useCallback(async () => {
+    setError("");
+    setLoading(true);
     const res = await fetch("/api/organizer/opportunities", { credentials: "include" });
     if (!res.ok) {
       const data = await safeJson(res);
@@ -55,6 +73,7 @@ function OpportunityApplicants() {
   const loadApplicants = useCallback(async (opportunityId) => {
     if (!opportunityId) {
       setApplicants([]);
+      setSelectedApplicant(null);
       return;
     }
     const res = await fetch(`/api/organizer/opportunities/${opportunityId}/applicants`, { credentials: "include" });
@@ -104,6 +123,7 @@ function OpportunityApplicants() {
     if (!pendingTransition || !selectedApplicant || !selectedOpportunityId) return;
     setTransitionBusy(true);
     setActionError("");
+    setSuccessMessage("");
 
     const nextStatus = pendingTransition.status;
     const optimisticId = selectedApplicant.id;
@@ -146,6 +166,7 @@ function OpportunityApplicants() {
       }
       setPendingTransition(null);
       setTransitionNote("");
+      setSuccessMessage(`Applicant moved to ${nextStatus}.`);
       await loadApplicants(selectedOpportunityId);
     } catch {
       setApplicants(previousApplicants);
@@ -159,170 +180,205 @@ function OpportunityApplicants() {
   const startTransition = (status) => {
     setPendingTransition({ status });
     setTransitionNote(status === "rejected" ? "" : "Reviewed via organizer dashboard.");
+    setSuccessMessage("");
   };
 
   if (loading) {
-    return <p className="opp-status" role="status">Loading applicants...</p>;
+    return (
+      <OrganizerLayout>
+        <PageState variant="loading" title="Loading applicants" message="Fetching your opportunities and applicant queue." />
+      </OrganizerLayout>
+    );
   }
 
   if (error) {
     return (
-      <section className="opp-empty-state" role="alert">
-        <h1>Applicants</h1>
-        <p>{error}</p>
-      </section>
+      <OrganizerLayout>
+        <PageState
+          variant="error"
+          title="Applicants"
+          message={error}
+          actionLabel="Retry"
+          onAction={loadOpportunities}
+        />
+      </OrganizerLayout>
     );
   }
 
   return (
     <OrganizerLayout>
       <div className="applicants-page">
-      <header className="applicants-header">
-        <div>
-          <h1>Applicants</h1>
-          <p>Review cover notes and move each applicant through the pipeline.</p>
-        </div>
-        <button type="button" className="btn-secondary" onClick={() => navigate("/organizer/opportunities")}>
-          Back to opportunities
-        </button>
-      </header>
-
-      <div className="applicants-toolbar">
-        <label>
-          <span>Opportunity</span>
-          <select
-            className="input"
-            value={selectedOpportunityId}
-            onChange={(event) => setSelectedOpportunityId(event.target.value)}
-          >
-            <option value="" disabled>
-              Select an opportunity
-            </option>
-            {opportunities.map((opportunity) => (
-              <option key={opportunity.id} value={opportunity.id}>
-                {opportunity.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        {selectedOpportunity && <StatusBadge status={selectedOpportunity.status} />}
-      </div>
-
-      {actionError && (
-        <div className="opp-inline-error" role="alert">
-          {actionError}
-        </div>
-      )}
-
-      <div className="applicants-grid">
-        <section className="applicants-list-panel" aria-labelledby="applicant-list-title">
-          <div className="panel-heading">
-            <h2 id="applicant-list-title">Applicant list</h2>
-            <span>{applicants.length} total</span>
+        <header className="applicants-header">
+          <div>
+            <h1>Applicants</h1>
+            <p>Review cover notes and move each applicant through the pipeline.</p>
           </div>
-          {applicants.length === 0 ? (
-            <div className="opp-empty-list">
-              <p>No applicants yet for this opportunity.</p>
+          <button type="button" className="btn-secondary" onClick={() => navigate("/organizer/opportunities")}>
+            Back to opportunities
+          </button>
+        </header>
+
+        <div className="applicants-toolbar">
+          <label htmlFor="opportunity-selector">
+            <span>Opportunity</span>
+            <select
+              id="opportunity-selector"
+              className="input"
+              value={selectedOpportunityId}
+              onChange={(event) => setSelectedOpportunityId(event.target.value)}
+            >
+              <option value="" disabled>
+                Select an opportunity
+              </option>
+              {opportunities.map((opportunity) => (
+                <option key={opportunity.id} value={opportunity.id}>
+                  {opportunity.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          {selectedOpportunity && <StatusBadge status={selectedOpportunity.status} />}
+        </div>
+
+        {actionError && (
+          <InlineState
+            variant="error"
+            message={actionError}
+            actionLabel="Dismiss"
+            onAction={() => setActionError("")}
+          />
+        )}
+
+        {successMessage && (
+          <InlineState
+            variant="success"
+            message={successMessage}
+            actionLabel="Dismiss"
+            onAction={() => setSuccessMessage("")}
+          />
+        )}
+
+        <div className="applicants-grid">
+          <section className="applicants-list-panel" aria-labelledby="applicant-list-title">
+            <div className="panel-heading">
+              <h2 id="applicant-list-title">Applicant list</h2>
+              <span>{applicants.length} total</span>
             </div>
-          ) : (
-            <ApplicantList
-              applicants={applicants}
-              selectedId={selectedApplicant?.id}
-              onSelect={setSelectedApplicant}
-            />
-          )}
-        </section>
+            {!selectedOpportunityId ? (
+              <PageState
+                variant="empty"
+                title="Choose an opportunity"
+                message="Select an opportunity to inspect applicants, notes, and review history."
+              />
+            ) : applicants.length === 0 ? (
+              <PageState
+                variant="empty"
+                title="No applicants yet"
+                message="This opportunity does not have applicants yet."
+              />
+            ) : (
+              <ApplicantList
+                applicants={applicants}
+                selectedId={selectedApplicant?.id}
+                onSelect={setSelectedApplicant}
+              />
+            )}
+          </section>
 
-        <section className="applicant-detail" aria-labelledby="applicant-detail-title">
-          {selectedApplicant ? (
-            <>
-              <div className="panel-heading">
-                <div>
-                  <p className="opp-card-subtitle">{selectedApplicant.email}</p>
-                  <h2 id="applicant-detail-title">{selectedApplicant.name || selectedApplicant.full_name || "Applicant details"}</h2>
+          <section className="applicant-detail" aria-labelledby="applicant-detail-title" ref={detailRef} tabIndex={-1}>
+            {selectedApplicant ? (
+              <>
+                <div className="panel-heading">
+                  <div>
+                    <p className="opp-card-subtitle">{selectedApplicant.email}</p>
+                    <h2 id="applicant-detail-title">{selectedApplicant.name || selectedApplicant.full_name || "Applicant details"}</h2>
+                  </div>
+                  <StatusBadge status={selectedApplicant.status} />
                 </div>
-                <StatusBadge status={selectedApplicant.status} />
-              </div>
 
-              <div className="applicant-detail-block">
-                <h3>Cover note</h3>
-                <p>{selectedApplicant.cover_note || selectedApplicant.message || "No cover note provided."}</p>
-              </div>
+                <div className="applicant-detail-block">
+                  <h3>Cover note</h3>
+                  <p>{selectedApplicant.cover_note || selectedApplicant.message || "No cover note provided."}</p>
+                </div>
 
-              <div className="applicant-detail-block">
-                <h3>History</h3>
-                {selectedApplicant.history.length === 0 ? (
-                  <p>No status history yet.</p>
+                <div className="applicant-detail-block">
+                  <h3>History</h3>
+                  {selectedApplicant.history.length === 0 ? (
+                    <p>No status history yet.</p>
+                  ) : (
+                    <ul className="history-list">
+                      {selectedApplicant.history.map((entry, index) => (
+                        <li key={`${entry.status}-${index}`}>
+                          <strong>{entry.status}</strong>
+                          <span>{entry.at ? new Date(entry.at).toLocaleString() : "Unknown time"}</span>
+                          {entry.note && <p>{entry.note}</p>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                {pendingTransition ? (
+                  <div className="transition-confirm" role="status" aria-live="polite" ref={transitionRef} tabIndex={-1}>
+                    <p>
+                      Confirm moving this applicant to <strong>{pendingTransition.status}</strong>.
+                    </p>
+                    {pendingTransition.status === "rejected" && (
+                      <label htmlFor="rejection-note">
+                        <span>Rejection note</span>
+                        <textarea
+                          id="rejection-note"
+                          className="input"
+                          rows={4}
+                          value={transitionNote}
+                          onChange={(event) => setTransitionNote(event.target.value)}
+                          placeholder="Explain the reason for rejection"
+                        />
+                      </label>
+                    )}
+                    {pendingTransition.status !== "rejected" && (
+                      <label htmlFor="transition-note">
+                        <span>Optional note</span>
+                        <input
+                          id="transition-note"
+                          className="input"
+                          value={transitionNote}
+                          onChange={(event) => setTransitionNote(event.target.value)}
+                        />
+                      </label>
+                    )}
+                    <div className="transition-actions">
+                      <button type="button" className="btn-secondary" onClick={() => setPendingTransition(null)} disabled={transitionBusy}>
+                        Cancel
+                      </button>
+                      <button type="button" className="btn-primary btn-primary-inline" onClick={runTransition} disabled={transitionBusy}>
+                        {transitionBusy ? "Saving..." : "Confirm"}
+                      </button>
+                    </div>
+                  </div>
                 ) : (
-                  <ul className="history-list">
-                    {selectedApplicant.history.map((entry, index) => (
-                      <li key={`${entry.status}-${index}`}>
-                        <strong>{entry.status}</strong>
-                        <span>{entry.at ? new Date(entry.at).toLocaleString() : "Unknown time"}</span>
-                        {entry.note && <p>{entry.note}</p>}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {pendingTransition ? (
-                <div className="transition-confirm" role="status" aria-live="polite">
-                  <p>
-                    Confirm moving this applicant to <strong>{pendingTransition.status}</strong>.
-                  </p>
-                  {pendingTransition.status === "rejected" && (
-                    <label>
-                      <span>Rejection note</span>
-                      <textarea
-                        className="input"
-                        rows={4}
-                        value={transitionNote}
-                        onChange={(event) => setTransitionNote(event.target.value)}
-                        placeholder="Explain the reason for rejection"
-                      />
-                    </label>
-                  )}
-                  {pendingTransition.status !== "rejected" && (
-                    <label>
-                      <span>Optional note</span>
-                      <input
-                        className="input"
-                        value={transitionNote}
-                        onChange={(event) => setTransitionNote(event.target.value)}
-                      />
-                    </label>
-                  )}
                   <div className="transition-actions">
-                    <button type="button" className="btn-secondary" onClick={() => setPendingTransition(null)} disabled={transitionBusy}>
-                      Cancel
+                    <button type="button" className="btn-secondary" onClick={() => startTransition("review")}>
+                      Mark review
                     </button>
-                    <button type="button" className="btn-primary btn-primary-inline" onClick={runTransition} disabled={transitionBusy}>
-                      {transitionBusy ? "Saving..." : "Confirm"}
+                    <button type="button" className="btn-primary btn-primary-inline" onClick={() => startTransition("accepted")}>
+                      Accept
+                    </button>
+                    <button type="button" className="btn-danger" onClick={() => startTransition("rejected")}>
+                      Reject
                     </button>
                   </div>
-                </div>
-              ) : (
-                <div className="transition-actions">
-                  <button type="button" className="btn-secondary" onClick={() => startTransition("review")}>
-                    Mark review
-                  </button>
-                  <button type="button" className="btn-primary btn-primary-inline" onClick={() => startTransition("accepted")}>
-                    Accept
-                  </button>
-                  <button type="button" className="btn-danger" onClick={() => startTransition("rejected")}>
-                    Reject
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="opp-empty-list">
-              <p>Select an applicant to inspect their notes and history.</p>
-            </div>
-          )}
-        </section>
-      </div>
+                )}
+              </>
+            ) : (
+              <PageState
+                variant="empty"
+                title="Open an applicant"
+                message="Select an applicant to inspect their notes and status history."
+              />
+            )}
+          </section>
+        </div>
       </div>
     </OrganizerLayout>
   );

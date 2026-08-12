@@ -1,4 +1,5 @@
 import StatusBadge from "../../shared/StatusBadge";
+import { forwardRef } from "react";
 
 function formatDateTime(value) {
   if (!value) return "Not available";
@@ -11,10 +12,10 @@ function formatDateTime(value) {
   });
 }
 
-function ReportDetail({ report, onResolve, onDismiss, onSelectOpportunity }) {
+const ReportDetail = forwardRef(function ReportDetail({ report, onResolve, onDismiss, onSelectOpportunity }, ref) {
   if (!report) {
     return (
-      <section className="report-detail empty">
+      <section className="report-detail empty" ref={ref} tabIndex={-1}>
         <h2>Open a report</h2>
         <p>Select a report on the left to review its details and decide whether to resolve or dismiss it.</p>
       </section>
@@ -22,7 +23,7 @@ function ReportDetail({ report, onResolve, onDismiss, onSelectOpportunity }) {
   }
 
   return (
-    <section className="report-detail" aria-labelledby="report-detail-title">
+    <section className="report-detail" aria-labelledby="report-detail-title" tabIndex={-1} ref={ref}>
       <div className="report-detail-header">
         <div>
           <p className="report-detail-kicker">Report #{report.id}</p>
@@ -75,6 +76,6 @@ function ReportDetail({ report, onResolve, onDismiss, onSelectOpportunity }) {
       </div>
     </section>
   );
-}
+});
 
 export default ReportDetail;

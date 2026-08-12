@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import OrganizerLayout from "../../../components/layout/OrganizerLayout";
 import StatusBadge from "../../../components/shared/StatusBadge";
+import PageState from "../../../components/shared/PageState";
 import "./OpportunityAnalytics.css";
 
 function safeJson(res) {
@@ -65,38 +66,36 @@ function OpportunityAnalytics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    let ignore = false;
-    (async () => {
-      if (!opportunityId) {
-        setLoading(false);
-        setError("Select an opportunity to view analytics.");
-        return;
+  const loadAnalytics = useCallback(async () => {
+    if (!opportunityId) {
+      setLoading(false);
+      setError("Select an opportunity to view analytics.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/organizer/opportunities/${opportunityId}/analytics`, { credentials: "include" });
+      if (!res.ok) {
+        const data = await safeJson(res);
+        throw new Error(data.error || "Failed to load analytics.");
       }
-      setLoading(true);
-      setError("");
-      try {
-        const res = await fetch(`/api/organizer/opportunities/${opportunityId}/analytics`, { credentials: "include" });
-        if (!res.ok) {
-          const data = await safeJson(res);
-          throw new Error(data.error || "Failed to load analytics.");
-        }
-        const data = await res.json();
-        if (ignore) return;
-        setOpportunity(data.opportunity || data.opportunity_summary || null);
-        setSummary(normalizeSummary(data.summary || data.analytics?.summary || data));
-        setFunnel(pickFunnel(data));
-        setTimeseries(pickSeries(data));
-      } catch (err) {
-        if (!ignore) setError(err.message || "Something went wrong.");
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    })();
-    return () => {
-      ignore = true;
-    };
+      const data = await res.json();
+      setOpportunity(data.opportunity || data.opportunity_summary || null);
+      setSummary(normalizeSummary(data.summary || data.analytics?.summary || data));
+      setFunnel(pickFunnel(data));
+      setTimeseries(pickSeries(data));
+    } catch (err) {
+      setError(err.message || "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
   }, [opportunityId]);
+
+  useEffect(() => {
+    void loadAnalytics();
+  }, [loadAnalytics]);
 
   const funnelMax = useMemo(() => Math.max(1, ...funnel.map((item) => Number(item.count || item.value || 0))), [funnel]);
   const seriesMax = useMemo(() => Math.max(1, ...timeseries.map((item) => Number(item.count || item.value || 0))), [timeseries]);
@@ -110,69 +109,78 @@ function OpportunityAnalytics() {
   ];
 
   if (loading) {
-    return <p className="opp-status" role="status">Loading analytics...</p>;
+    return (
+      <OrganizerLayout>
+        <PageState variant="loading" title="Loading analytics" message="Fetching the funnel and activity summary for this opportunity." />
+      </OrganizerLayout>
+    );
   }
 
   if (error) {
     return (
-      <section className="opp-empty-state" role="alert">
-        <h1>Analytics</h1>
-        <p>{error}</p>
-      </section>
+      <OrganizerLayout>
+        <PageState
+          variant={opportunityId ? "error" : "empty"}
+          title="Opportunity analytics"
+          message={error}
+          actionLabel={opportunityId ? "Retry" : undefined}
+          onAction={opportunityId ? loadAnalytics : undefined}
+        />
+      </OrganizerLayout>
     );
   }
 
   return (
     <OrganizerLayout>
       <div className="analytics-page">
-      <header className="analytics-header">
-        <div>
-          <h1>Opportunity analytics</h1>
-          <p>Track funnel progression, conversions, and activity over time.</p>
-        </div>
-        {opportunity && <StatusBadge status={opportunity.status} />}
-      </header>
+        <header className="analytics-header">
+          <div>
+            <h1>Opportunity analytics</h1>
+            <p>Track funnel progression, conversions, and activity over time.</p>
+          </div>
+          {opportunity && <StatusBadge status={opportunity.status} />}
+        </header>
 
-      {opportunity && (
-        <section className="analytics-opportunity">
-          <h2>{opportunity.title || "Selected opportunity"}</h2>
-          <p>{opportunity.summary || opportunity.description || "No summary available."}</p>
-        </section>
-      )}
+        {opportunity && (
+          <section className="analytics-opportunity">
+            <h2>{opportunity.title || "Selected opportunity"}</h2>
+            <p>{opportunity.summary || opportunity.description || "No summary available."}</p>
+          </section>
+        )}
 
-      <section className="summary-grid" aria-label="Analytics summary">
-        {summaryCards.map((card) => (
-          <article key={card.label} className="summary-card">
-            <span>{card.label}</span>
-            <strong>{card.value}</strong>
+        <section className="summary-grid" aria-label="Analytics summary">
+          {summaryCards.map((card) => (
+            <article key={card.label} className="summary-card">
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+            </article>
+          ))}
+          <article className="summary-card summary-card-wide">
+            <span>Conversion</span>
+            <strong>{Math.round((summary?.conversion || 0) * 100)}%</strong>
           </article>
-        ))}
-        <article className="summary-card summary-card-wide">
-          <span>Conversion</span>
-          <strong>{Math.round((summary?.conversion || 0) * 100)}%</strong>
-        </article>
-      </section>
+        </section>
 
-      <div className="analytics-grid">
-        <BarChart
-          title="Funnel"
-          data={funnel}
-          valueKey="count"
-          labelKey="stage"
-          maxValue={funnelMax}
-          colorClass="funnel"
-          ariaLabel="Opportunity funnel chart"
-        />
-        <BarChart
-          title="Timeseries"
-          data={timeseries}
-          valueKey="count"
-          labelKey="date"
-          maxValue={seriesMax}
-          colorClass="timeseries"
-          ariaLabel="Opportunity activity over time"
-        />
-      </div>
+        <div className="analytics-grid">
+          <BarChart
+            title="Funnel"
+            data={funnel}
+            valueKey="count"
+            labelKey="stage"
+            maxValue={funnelMax}
+            colorClass="funnel"
+            ariaLabel="Opportunity funnel chart"
+          />
+          <BarChart
+            title="Timeseries"
+            data={timeseries}
+            valueKey="count"
+            labelKey="date"
+            maxValue={seriesMax}
+            colorClass="timeseries"
+            ariaLabel="Opportunity activity over time"
+          />
+        </div>
       </div>
     </OrganizerLayout>
   );

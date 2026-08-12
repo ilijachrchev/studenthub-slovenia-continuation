@@ -70,6 +70,18 @@ function validateForm(form) {
 function OpportunityForm({ opportunity, onSubmit, onCancel, saving, serverError }) {
   const [form, setForm] = useState(() => buildFormValue(opportunity));
   const [errors, setErrors] = useState({});
+  const titleId = "opportunity-title";
+  const summaryId = "opportunity-summary";
+  const descriptionId = "opportunity-description";
+  const locationId = "opportunity-location";
+  const capacityId = "opportunity-capacity";
+  const deadlineId = "opportunity-deadline";
+  const startDateId = "opportunity-start-date";
+  const endDateId = "opportunity-end-date";
+  const compensationId = "opportunity-compensation";
+  const contactEmailId = "opportunity-contact-email";
+  const applyUrlId = "opportunity-apply-url";
+  const tagsId = "opportunity-tags";
 
   const update = (field) => (event) => {
     const value = event.target.type === "checkbox" ? event.target.checked : event.target.value;
@@ -119,60 +131,60 @@ function OpportunityForm({ opportunity, onSubmit, onCancel, saving, serverError 
       <form className="opp-form" onSubmit={handleSubmit}>
         <label>
           <span>Title</span>
-          <input className="input" value={form.title} onChange={update("title")} maxLength={120} />
+          <input id={titleId} className="input" value={form.title} onChange={update("title")} maxLength={120} aria-invalid={Boolean(fieldError("title"))} />
           {fieldError("title") && <small>{fieldError("title")}</small>}
         </label>
         <label>
           <span>Summary</span>
-          <input className="input" value={form.summary} onChange={update("summary")} maxLength={180} />
+          <input id={summaryId} className="input" value={form.summary} onChange={update("summary")} maxLength={180} />
         </label>
         <label className="opp-form-span-2">
           <span>Description</span>
-          <textarea className="input" rows={5} value={form.description} onChange={update("description")} />
+          <textarea id={descriptionId} className="input" rows={5} value={form.description} onChange={update("description")} aria-invalid={Boolean(fieldError("description"))} />
           {fieldError("description") && <small>{fieldError("description")}</small>}
         </label>
         <label>
           <span>Location</span>
-          <input className="input" value={form.location} onChange={update("location")} />
+          <input id={locationId} className="input" value={form.location} onChange={update("location")} aria-invalid={Boolean(fieldError("location"))} />
           {fieldError("location") && <small>{fieldError("location")}</small>}
         </label>
         <label>
           <span>Capacity</span>
-          <input className="input" type="number" min="1" value={form.capacity} onChange={update("capacity")} />
+          <input id={capacityId} className="input" type="number" min="1" value={form.capacity} onChange={update("capacity")} aria-invalid={Boolean(fieldError("capacity"))} />
           {fieldError("capacity") && <small>{fieldError("capacity")}</small>}
         </label>
         <label>
           <span>Application deadline</span>
-          <input className="input" type="datetime-local" value={form.application_deadline} onChange={update("application_deadline")} />
+          <input id={deadlineId} className="input" type="datetime-local" value={form.application_deadline} onChange={update("application_deadline")} aria-invalid={Boolean(fieldError("application_deadline"))} />
           {fieldError("application_deadline") && <small>{fieldError("application_deadline")}</small>}
         </label>
         <label>
           <span>Start date</span>
-          <input className="input" type="datetime-local" value={form.start_date} onChange={update("start_date")} />
+          <input id={startDateId} className="input" type="datetime-local" value={form.start_date} onChange={update("start_date")} aria-invalid={Boolean(fieldError("start_date"))} />
           {fieldError("start_date") && <small>{fieldError("start_date")}</small>}
         </label>
         <label>
           <span>End date</span>
-          <input className="input" type="datetime-local" value={form.end_date} onChange={update("end_date")} />
+          <input id={endDateId} className="input" type="datetime-local" value={form.end_date} onChange={update("end_date")} aria-invalid={Boolean(fieldError("end_date"))} />
           {fieldError("end_date") && <small>{fieldError("end_date")}</small>}
         </label>
         <label>
           <span>Compensation</span>
-          <input className="input" value={form.compensation} onChange={update("compensation")} />
+          <input id={compensationId} className="input" value={form.compensation} onChange={update("compensation")} />
         </label>
         <label>
           <span>Contact email</span>
-          <input className="input" type="email" value={form.contact_email} onChange={update("contact_email")} />
+          <input id={contactEmailId} className="input" type="email" value={form.contact_email} onChange={update("contact_email")} aria-invalid={Boolean(fieldError("contact_email"))} />
           {fieldError("contact_email") && <small>{fieldError("contact_email")}</small>}
         </label>
         <label>
           <span>Application link</span>
-          <input className="input" value={form.apply_url} onChange={update("apply_url")} />
+          <input id={applyUrlId} className="input" value={form.apply_url} onChange={update("apply_url")} aria-invalid={Boolean(fieldError("apply_url"))} />
           {fieldError("apply_url") && <small>{fieldError("apply_url")}</small>}
         </label>
         <label className="opp-form-span-2">
           <span>Tags</span>
-          <input className="input" value={form.tags} onChange={update("tags")} placeholder="Research, design, part-time" />
+          <input id={tagsId} className="input" value={form.tags} onChange={update("tags")} placeholder="Research, design, part-time" />
         </label>
 
         <div className="opp-form-actions">

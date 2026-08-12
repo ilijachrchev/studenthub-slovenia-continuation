@@ -138,6 +138,13 @@
   gap: 14px;
 }
 
+.report-list,
+.applicant-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
 .opp-card,
 .report-card,
 .applicant-row {
@@ -297,6 +304,15 @@
   text-align: left;
   background: #fff;
   cursor: pointer;
+}
+
+.report-card:focus-visible,
+.applicant-row:focus-visible,
+.opp-card button:focus-visible,
+.btn-secondary:focus-visible,
+.btn-warning:focus-visible,
+.btn-danger:focus-visible {
+  box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.2);
 }
 
 .applicant-row.active,

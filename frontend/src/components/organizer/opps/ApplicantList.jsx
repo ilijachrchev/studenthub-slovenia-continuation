@@ -13,29 +13,31 @@ function formatDateTime(value) {
 
 function ApplicantList({ applicants, selectedId, onSelect }) {
   return (
-    <div className="applicant-list" role="list" aria-label="Applicants">
+    <ul className="applicant-list" role="listbox" aria-label="Applicants">
       {applicants.map((applicant) => (
-        <button
-          key={applicant.id}
-          type="button"
-          role="listitem"
-          className={selectedId === applicant.id ? "applicant-row active" : "applicant-row"}
-          onClick={() => onSelect(applicant)}
-        >
-          <div className="applicant-row-main">
-            <div>
-              <h3>{applicant.name || applicant.full_name || applicant.email}</h3>
-              <p>{applicant.email}</p>
+        <li key={applicant.id}>
+          <button
+            type="button"
+            role="option"
+            aria-selected={selectedId === applicant.id}
+            className={selectedId === applicant.id ? "applicant-row active" : "applicant-row"}
+            onClick={() => onSelect(applicant)}
+          >
+            <div className="applicant-row-main">
+              <div>
+                <h3>{applicant.name || applicant.full_name || applicant.email}</h3>
+                <p>{applicant.email}</p>
+              </div>
+              <StatusBadge status={applicant.status} />
             </div>
-            <StatusBadge status={applicant.status} />
-          </div>
-          <div className="applicant-row-meta">
-            <span>Applied {formatDateTime(applicant.applied_at || applicant.created_at)}</span>
-            {applicant.source && <span>{applicant.source}</span>}
-          </div>
-        </button>
+            <div className="applicant-row-meta">
+              <span>Applied {formatDateTime(applicant.applied_at || applicant.created_at)}</span>
+              {applicant.source && <span>{applicant.source}</span>}
+            </div>
+          </button>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 

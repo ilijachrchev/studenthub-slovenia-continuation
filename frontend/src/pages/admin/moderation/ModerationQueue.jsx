@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import ReportCard from "../../../components/admin/moderation/ReportCard";
 import ReportDetail from "../../../components/admin/moderation/ReportDetail";
 import StatusBadge from "../../../components/shared/StatusBadge";
+import PageState, { InlineState } from "../../../components/shared/PageState";
 import "./ModerationQueue.css";
 
 function safeJson(res) {
@@ -27,8 +28,25 @@ function ModerationQueue() {
   const [decisionNote, setDecisionNote] = useState("");
   const [archiveOpportunity, setArchiveOpportunity] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const detailRef = useRef(null);
+  const decisionRef = useRef(null);
+
+  useEffect(() => {
+    if (selectedReport && detailRef.current && !decision) {
+      detailRef.current.focus();
+    }
+  }, [selectedReport, decision]);
+
+  useEffect(() => {
+    if (decision && decisionRef.current) {
+      decisionRef.current.focus();
+    }
+  }, [decision]);
 
   const loadReports = useCallback(async (filter = statusFilter) => {
+    setError("");
+    setLoading(true);
     const res = await fetch(`/api/admin/moderation/reports?status=${encodeURIComponent(filter)}`, {
       credentials: "include",
     });
@@ -71,6 +89,7 @@ function ModerationQueue() {
 
   const openReport = async (report) => {
     setActionError("");
+    setSuccessMessage("");
     setSelectedReport(report);
     try {
       await loadDetail(report);
@@ -83,6 +102,7 @@ function ModerationQueue() {
     if (!selectedReport || !decision) return;
     setSubmitting(true);
     setActionError("");
+    setSuccessMessage("");
     const endpoint = decision === "resolve" ? "resolve" : "dismiss";
     const previousReports = reports;
     const optimisticStatus = decision === "resolve" ? "resolved" : "dismissed";
@@ -110,6 +130,7 @@ function ModerationQueue() {
       setDecision(null);
       setDecisionNote("");
       setArchiveOpportunity(false);
+      setSuccessMessage(decision === "resolve" ? "Report resolved." : "Report dismissed.");
     } catch {
       setReports(previousReports);
       setActionError("Something went wrong. Please try again.");
@@ -130,15 +151,24 @@ function ModerationQueue() {
   );
 
   if (loading) {
-    return <p className="opp-status" role="status">Loading moderation queue...</p>;
+    return (
+      <AdminLayout>
+        <PageState variant="loading" title="Loading moderation queue" message="Fetching reports and moderation details." />
+      </AdminLayout>
+    );
   }
 
   if (error) {
     return (
-      <section className="opp-empty-state" role="alert">
-        <h1>Moderation queue</h1>
-        <p>{error}</p>
-      </section>
+      <AdminLayout>
+        <PageState
+          variant="error"
+          title="Moderation queue"
+          message={error}
+          actionLabel="Retry"
+          onAction={() => loadReports(statusFilter)}
+        />
+      </AdminLayout>
     );
   }
 
@@ -174,9 +204,11 @@ function ModerationQueue() {
         </div>
 
         {actionError && (
-          <div className="opp-inline-error" role="alert">
-            {actionError}
-          </div>
+          <InlineState variant="error" message={actionError} actionLabel="Dismiss" onAction={() => setActionError("")} />
+        )}
+
+        {successMessage && (
+          <InlineState variant="success" message={successMessage} actionLabel="Dismiss" onAction={() => setSuccessMessage("")} />
         )}
 
         <div className="moderation-grid">
@@ -186,11 +218,9 @@ function ModerationQueue() {
               <span>{reports.length} total</span>
             </div>
             {reports.length === 0 ? (
-              <div className="opp-empty-list">
-                <p>No reports match this filter.</p>
-              </div>
+              <PageState variant="empty" title="No reports" message="No reports match this filter." />
             ) : (
-              <div className="report-list">
+              <ul className="report-list" role="listbox" aria-label="Reports">
                 {reports.map((report) => (
                   <ReportCard
                     key={report.id}
@@ -199,12 +229,13 @@ function ModerationQueue() {
                     onOpen={openReport}
                   />
                 ))}
-              </div>
+              </ul>
             )}
           </section>
 
           <ReportDetail
             report={selectedReport}
+            ref={detailRef}
             onResolve={(report) => {
               setSelectedReport(report);
               setDecision("resolve");
@@ -224,7 +255,7 @@ function ModerationQueue() {
         </div>
 
         {decision && selectedReport && (
-          <section className="decision-panel" aria-labelledby="decision-title">
+          <section className="decision-panel" aria-labelledby="decision-title" ref={decisionRef} tabIndex={-1}>
             <div className="panel-heading">
               <h2 id="decision-title">{decision === "resolve" ? "Resolve report" : "Dismiss report"}</h2>
               <button type="button" className="btn-secondary" onClick={() => setDecision(null)} disabled={submitting}>

@@ -12,7 +12,6 @@ function SearchResults() {
 
   useEffect(() => {
     if (!query) {
-        setEvents([]);
         return;
     }
 
@@ -28,7 +27,8 @@ function SearchResults() {
             } else {
                 setEvents(data.events || []);
             }
-        } catch {
+        } catch (error) {
+            void error;
             setError("Search failed");
         } finally {
             setLoading(false);

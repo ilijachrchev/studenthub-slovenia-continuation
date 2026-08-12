@@ -34,7 +34,7 @@ function Saved() {
             credentials: "include",
         });
     } catch {
-
+        // Ignore delete failures; the UI is already updated optimistically.
     }
   };
 

@@ -7,6 +7,7 @@ function AdminSidebar() {
     const links = [
         { label: "Pending Events", path: "/admin" },
         { label: "Organizations", path: "/admin/organizations" },
+        { label: "Moderation", path: "/admin/moderation" },
     ];
 
     return (

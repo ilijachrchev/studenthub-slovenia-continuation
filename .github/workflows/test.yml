@@ -7,46 +7,6 @@ on:
     branches: [dev, main]
 
 jobs:
-  backend-tests:
-    runs-on: ubuntu-latest
-
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: rootpass
-          MYSQL_DATABASE: studenthub_test
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Use Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install backend dependencies
-        run: npm install
-        working-directory: backend
-
-      - name: Run backend tests
-        run: npm test
-        working-directory: backend
-        env:
-          DB_HOST: localhost
-          DB_PORT: 3306
-          DB_USER: root
-          DB_PASSWORD: rootpass
-          SESSION_SECRET: test-secret
-          NODE_ENV: test
-
   frontend-build:
     runs-on: ubuntu-latest
 

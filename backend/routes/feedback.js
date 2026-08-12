@@ -54,18 +54,17 @@ router.post("/:eventId", requireAuth, catchAsync(async (req, res) => {
         return res.status(403).json({error: "You can only leave feedback for events you registered for"});
     }
 
-    const { rows: existing } = await pool.query(
-        "SELECT id FROM feedback WHERE user_id = $1 AND event_id = $2",
-        [userId, eventId]
-    );
-    if (existing.length) {
-        return res.status(409).json({error: "You have already left feedback for this event"})
-    }
-
-    await pool.query(
-        "INSERT INTO feedback (user_id, event_id, rating, comment) VALUES ($1, $2, $3, $4)",
+    const { rows } = await pool.query(
+        `INSERT INTO feedback (user_id, event_id, rating, comment)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (user_id, event_id) DO NOTHING
+         RETURNING id`,
         [userId, eventId, rating, comment ? comment.trim() : null]
     );
+
+    if (rows.length === 0) {
+        return res.status(409).json({error: "You have already left feedback for this event"});
+    }
 
     res.status(201).json({message: "Feedback submitted"})
 }));

@@ -44,19 +44,17 @@ router.get("/ids", catchAsync(async (req, res) => {
 router.post("/:id", requireAuth, catchAsync(async (req, res) => {
     const userId = req.session.user.id;
     const eventId = req.params.id;
-
-    const { rows: existing } = await pool.query(
-        "SELECT id FROM bookmark WHERE user_id = $1 AND event_id = $2",
+    const { rows } = await pool.query(
+        `INSERT INTO bookmark (user_id, event_id)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id, event_id) DO NOTHING
+         RETURNING id`,
         [userId, eventId]
     );
-    if (existing.length) {
+
+    if (rows.length === 0) {
         return res.status(409).json({ error: "Event already saved" });
     }
-
-    await pool.query(
-        "INSERT INTO bookmark (user_id, event_id) VALUES ($1, $2)",
-        [userId, eventId]
-    );
 
     res.status(201).json({message: "Event saved"});
 }));

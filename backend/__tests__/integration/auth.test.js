@@ -2,234 +2,275 @@ const request = require("supertest");
 const app = require("../../app");
 const pool = require("../../db");
 
-afterAll(async () => {
-  await pool.end();
-});
+function uniqueEmail(prefix) {
+  return `${prefix}.${Date.now()}.${Math.random().toString(16).slice(2)}@test.com`;
+}
 
-describe("POST /api/auth/register", () => {
-  test("registers a new organizer successfully", async () => {
-    const res = await request(app)
-      .post("/api/auth/register")
-      .send({
-        first_name: "New",
-        last_name: "Organizer",
-        email: "neworg@test.com",
-        password: "strongpass1",
-        role: "organizer",
-      });
+let ipCounter = 1;
+function uniqueIp() {
+  return `127.0.0.${ipCounter++}`;
+}
 
-    expect(res.status).toBe(201);
-    expect(res.body.message).toBe("Registration successful");
+function withIp(req, ip) {
+  return req.set("X-Forwarded-For", ip);
+}
 
-    // session cookie is set
-    expect(res.headers["set-cookie"]).toBeDefined();
+async function createOrganizerUser(email, password = "strongpass1") {
+  const ip = uniqueIp();
+  await withIp(request(app).post("/api/auth/register"), ip).send({
+    first_name: "Test",
+    last_name: "Organizer",
+    email,
+    password,
+    role: "organizer",
+  });
+}
+
+describe("authentication", () => {
+  const createdUsers = [];
+
+  afterAll(async () => {
+    if (createdUsers.length > 0) {
+      await pool.query(
+        `DELETE FROM "user" WHERE email = ANY($1::text[])`,
+        [createdUsers]
+      );
+    }
   });
 
-  test("rejects duplicate email", async () => {
-    const res = await request(app)
-      .post("/api/auth/register")
-      .send({
+  describe("POST /api/auth/register", () => {
+    test("registers a new organizer successfully", async () => {
+      const email = uniqueEmail("organizer");
+      createdUsers.push(email);
+      const ip = uniqueIp();
+
+      const res = await withIp(request(app).post("/api/auth/register"), ip)
+        .send({
+          first_name: "New",
+          last_name: "Organizer",
+          email,
+          password: "strongpass1",
+          role: "organizer",
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.message).toBe("Registration successful");
+      expect(res.headers["set-cookie"]).toBeDefined();
+    });
+
+    test("rejects duplicate email", async () => {
+      const email = uniqueEmail("duplicate");
+      createdUsers.push(email);
+      const ip = uniqueIp();
+
+      await withIp(request(app).post("/api/auth/register"), ip).send({
         first_name: "Dup",
         last_name: "User",
-        email: "organizer@studenthub.test",
+        email,
         password: "strongpass1",
         role: "organizer",
       });
 
-    expect(res.status).toBe(409);
-    expect(res.body.error).toMatch(/already registered/i);
+      const res = await withIp(request(app).post("/api/auth/register"), ip)
+        .send({
+          first_name: "Dup",
+          last_name: "User",
+          email,
+          password: "strongpass1",
+          role: "organizer",
+        });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/already registered/i);
+    });
+
+    test("rejects missing fields", async () => {
+      const res = await withIp(request(app).post("/api/auth/register"), uniqueIp())
+        .send({ email: "test@test.com" });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBeDefined();
+    });
+
+    test("rejects invalid email format", async () => {
+      const res = await withIp(request(app).post("/api/auth/register"), uniqueIp())
+        .send({
+          first_name: "Bad",
+          last_name: "Email",
+          email: "not-an-email",
+          password: "strongpass1",
+          role: "organizer",
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/email/i);
+    });
+
+    test("rejects weak password", async () => {
+      const res = await withIp(request(app).post("/api/auth/register"), uniqueIp())
+        .send({
+          first_name: "Weak",
+          last_name: "Pass",
+          email: uniqueEmail("weak"),
+          password: "short",
+          role: "organizer",
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/password/i);
+    });
   });
 
-  test("rejects missing fields", async () => {
-    const res = await request(app)
-      .post("/api/auth/register")
-      .send({ email: "test@test.com" });
+  describe("POST /api/auth/login", () => {
+    test("logs in with correct credentials", async () => {
+      const email = uniqueEmail("login");
+      createdUsers.push(email);
+      await createOrganizerUser(email, "strongpass1");
+      const ip = uniqueIp();
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toBeDefined();
+      const res = await withIp(request(app).post("/api/auth/login"), ip)
+        .send({
+          email,
+          password: "strongpass1",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe("Login successful");
+      expect(res.body.user.role).toBe("organizer");
+      expect(res.body.user.email).toBe(email);
+    });
+
+    test("rejects wrong password", async () => {
+      const email = uniqueEmail("wrong-password");
+      createdUsers.push(email);
+      await createOrganizerUser(email, "strongpass1");
+      const ip = uniqueIp();
+
+      const res = await withIp(request(app).post("/api/auth/login"), ip)
+        .send({
+          email,
+          password: "wrongpassword",
+        });
+
+      expect(res.status).toBe(401);
+      expect(res.body.error).toMatch(/invalid/i);
+    });
+
+    test("rejects non-existent email", async () => {
+      const res = await withIp(request(app).post("/api/auth/login"), uniqueIp())
+        .send({
+          email: uniqueEmail("missing"),
+          password: "anypassword",
+        });
+
+      expect(res.status).toBe(401);
+      expect(res.body.error).toMatch(/invalid/i);
+    });
+
+    test("rejects missing fields", async () => {
+      const res = await withIp(request(app).post("/api/auth/login"), uniqueIp())
+        .send({ email: "test@test.com" });
+
+      expect(res.status).toBe(400);
+    });
   });
 
-  test("rejects invalid email format", async () => {
-    const res = await request(app)
-      .post("/api/auth/register")
-      .send({
-        first_name: "Bad",
-        last_name: "Email",
-        email: "not-an-email",
-        password: "strongpass1",
-        role: "organizer",
-      });
+  describe("session lifecycle", () => {
+    test("GET /api/auth/me returns user when logged in and 401 when not", async () => {
+      const unauthenticated = await withIp(request(app).get("/api/auth/me"), uniqueIp());
+      expect(unauthenticated.status).toBe(401);
 
-    expect(res.status).toBe(400);
+      const email = uniqueEmail("me");
+      createdUsers.push(email);
+      await createOrganizerUser(email, "strongpass1");
+      const ip = uniqueIp();
+
+      const agent = request.agent(app);
+      await withIp(agent.post("/api/auth/login"), ip).send({ email, password: "strongpass1" });
+
+      const res = await withIp(agent.get("/api/auth/me"), ip);
+      expect(res.status).toBe(200);
+      expect(res.body.user.email).toBe(email);
+    });
+
+    test("logout destroys the session", async () => {
+      const email = uniqueEmail("logout");
+      createdUsers.push(email);
+      await createOrganizerUser(email, "strongpass1");
+      const ip = uniqueIp();
+
+      const agent = request.agent(app);
+      await withIp(agent.post("/api/auth/login"), ip).send({ email, password: "strongpass1" });
+
+      const res = await withIp(agent.post("/api/auth/logout"), ip);
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe("Logged out");
+
+      const meRes = await withIp(agent.get("/api/auth/me"), ip);
+      expect(meRes.status).toBe(401);
+    });
   });
 
-  test("rejects weak password (under 8 chars)", async () => {
-    const res = await request(app)
-      .post("/api/auth/register")
-      .send({
-        first_name: "Weak",
-        last_name: "Pass",
-        email: "weak@test.com",
-        password: "short",
-        role: "organizer",
-      });
+  describe("POST /api/auth/reset-password", () => {
+    test("resets password successfully and invalidates the old password", async () => {
+      const email = uniqueEmail("reset");
+      createdUsers.push(email);
+      await createOrganizerUser(email, "oldpass123");
+      const ip = uniqueIp();
 
-    expect(res.status).toBe(400);
-  });
-});
+      const agent = request.agent(app);
+      await withIp(agent.post("/api/auth/login"), ip).send({ email, password: "oldpass123" });
 
-describe("POST /api/auth/login", () => {
-  const agent = request.agent(app);
-
-  test("logs in with correct credentials", async () => {
-    const res = await agent
-      .post("/api/auth/login")
-      .send({
-        email: "organizer@studenthub.test",
-        password: "organizer123",
-      });
-
-    expect(res.status).toBe(200);
-    expect(res.body.message).toBe("Login successful");
-    expect(res.body.user.role).toBe("organizer");
-    expect(res.body.user.email).toBe("organizer@studenthub.test");
-  });
-
-  test("GET /api/auth/me returns user when logged in", async () => {
-    const res = await agent.get("/api/auth/me");
-
-    expect(res.status).toBe(200);
-    expect(res.body.user.email).toBe("organizer@studenthub.test");
-  });
-
-  test("rejects wrong password", async () => {
-    const res = await request(app)
-      .post("/api/auth/login")
-      .send({
-        email: "organizer@studenthub.test",
-        password: "wrongpassword",
-      });
-
-    expect(res.status).toBe(401);
-    expect(res.body.error).toMatch(/invalid/i);
-  });
-
-  test("rejects non-existent email", async () => {
-    const res = await request(app)
-      .post("/api/auth/login")
-      .send({
-        email: "nobody@test.com",
-        password: "anypassword",
-      });
-
-    expect(res.status).toBe(401);
-  });
-
-  test("rejects missing fields", async () => {
-    const res = await request(app)
-      .post("/api/auth/login")
-      .send({ email: "test@test.com" });
-
-    expect(res.status).toBe(400);
-  });
-});
-
-describe("GET /api/auth/me", () => {
-  test("returns 401 when not logged in", async () => {
-    const res = await request(app).get("/api/auth/me");
-
-    expect(res.status).toBe(401);
-    expect(res.body.error).toMatch(/not logged in/i);
-  });
-});
-
-describe("POST /api/auth/logout", () => {
-  test("destroys session and returns success", async () => {
-    const agent = request.agent(app);
-
-    // login first
-    await agent
-      .post("/api/auth/login")
-      .send({
-        email: "organizer@studenthub.test",
-        password: "organizer123",
-      });
-
-    // logout
-    const res = await agent.post("/api/auth/logout");
-    expect(res.status).toBe(200);
-    expect(res.body.message).toBe("Logged out");
-
-    // me should now return 401
-    const meRes = await agent.get("/api/auth/me");
-    expect(meRes.status).toBe(401);
-  });
-});
-
-describe("POST /api/auth/reset-password", () => {
-  test("resets password successfully", async () => {
-    const agent = request.agent(app);
-
-    // login
-    await agent
-      .post("/api/auth/login")
-      .send({
-        email: "organizer@studenthub.test",
-        password: "organizer123",
-      });
-
-    // reset password
-    const res = await agent
-      .post("/api/auth/reset-password")
-      .send({
-        email: "organizer@studenthub.test",
-        current_password: "organizer123",
+      const res = await withIp(agent.post("/api/auth/reset-password"), ip).send({
+        email,
+        current_password: "oldpass123",
         new_password: "newsecurepass1",
       });
 
-    expect(res.status).toBe(200);
-    expect(res.body.message).toMatch(/password updated/i);
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatch(/password updated/i);
 
-    // old password should no longer work
-    const loginRes = await request(app)
-      .post("/api/auth/login")
-      .send({
-        email: "organizer@studenthub.test",
-        password: "organizer123",
-      });
-    expect(loginRes.status).toBe(401);
+      const oldLogin = await withIp(request(app).post("/api/auth/login"), uniqueIp())
+        .send({ email, password: "oldpass123" });
+      expect(oldLogin.status).toBe(401);
 
-    // new password should work
-    const newLoginRes = await request(app)
-      .post("/api/auth/login")
-      .send({
-        email: "organizer@studenthub.test",
-        password: "newsecurepass1",
-      });
-    expect(newLoginRes.status).toBe(200);
-  });
+      const newLogin = await withIp(request(app).post("/api/auth/login"), uniqueIp())
+        .send({ email, password: "newsecurepass1" });
+      expect(newLogin.status).toBe(200);
+    });
 
-  test("rejects wrong current password", async () => {
-    const res = await request(app)
-      .post("/api/auth/reset-password")
-      .send({
-        email: "organizer@studenthub.test",
-        current_password: "wrongoldpass",
-        new_password: "newsecurepass1",
-      });
+    test("rejects wrong current password", async () => {
+      const email = uniqueEmail("reset-wrong");
+      createdUsers.push(email);
+      await createOrganizerUser(email, "oldpass123");
+      const ip = uniqueIp();
 
-    expect(res.status).toBe(401);
-  });
+      const res = await withIp(request(app).post("/api/auth/reset-password"), ip)
+        .send({
+          email,
+          current_password: "wrongoldpass",
+          new_password: "newsecurepass1",
+        });
 
-  test("rejects weak new password", async () => {
-    const res = await request(app)
-      .post("/api/auth/reset-password")
-      .send({
-        email: "organizer@studenthub.test",
-        current_password: "newsecurepass1",
-        new_password: "short",
-      });
+      expect(res.status).toBe(401);
+      expect(res.body.error).toMatch(/invalid/i);
+    });
 
-    expect(res.status).toBe(400);
+    test("rejects weak new password", async () => {
+      const email = uniqueEmail("reset-weak");
+      createdUsers.push(email);
+      await createOrganizerUser(email, "oldpass123");
+      const ip = uniqueIp();
+
+      const res = await withIp(request(app).post("/api/auth/reset-password"), ip)
+        .send({
+          email,
+          current_password: "oldpass123",
+          new_password: "short",
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/password/i);
+    });
   });
 });

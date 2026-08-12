@@ -9,4 +9,10 @@ const pool = new Pool({
   max: 10,
 });
 
+pool.on("error", (err) => {
+  if (process.env.NODE_ENV !== "test") {
+    console.error("Unexpected PostgreSQL pool error", err);
+  }
+});
+
 module.exports = pool;

@@ -2,6 +2,13 @@ const { Client } = require("pg");
 const Knex = require("knex");
 
 const TEST_DB = "studenthub_test";
+process.env.DB_CLIENT = "pg";
+process.env.DB_HOST = process.env.DB_HOST || "localhost";
+process.env.DB_PORT = process.env.DB_PORT || "5433";
+process.env.DB_USER = process.env.DB_USER || "studenti";
+process.env.DB_PASSWORD = process.env.DB_PASSWORD || "studentipass";
+process.env.DB_PASS = process.env.DB_PASS || process.env.DB_PASSWORD;
+process.env.DB_DATABASE = process.env.DB_DATABASE || "SISIII2026_89241041";
 const ROOT_CONFIG = {
   host: process.env.DB_HOST || "localhost",
   port: parseInt(process.env.DB_PORT || "5433", 10),
@@ -28,7 +35,10 @@ module.exports = async function globalSetup() {
   await client.end();
 
   // Run migrations using Knex
-  const knexConfig = require("../knexfile").test;
+  const knexConfig = {
+    ...require("../knexfile").test,
+    client: "pg",
+  };
   knexConfig.connection.database = TEST_DB;
   const knex = Knex(knexConfig);
 

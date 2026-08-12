@@ -17,6 +17,12 @@
 - Refresh on focus/visibility change added so unread counts persist across navigation and reloads.
 - Rollback and server-error surfacing added for notification actions and preference changes.
 
+### Admin Queue Follow-up
+- Pending events and pending organizations now use the shared async-state pattern with retryable errors.
+- Reject modal semantics tightened with dialog metadata and explicit button types.
+- Focused tests added for queue retry behavior and the reject dialog.
+
 ### Validation
 - Production build passes.
 - Vitest coverage added for protected/role loading states and notifications refresh/read behavior.
+- Admin queue retry and dialog accessibility tests added.

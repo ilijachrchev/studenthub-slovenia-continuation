@@ -4,6 +4,7 @@ const cors = require("cors");
 const session = require("express-session");
 const path = require('path');
 const fs = require('fs');
+const pinoHttp = require("pino-http");
 
 const authRoutes = require("./routes/auth");
 const lookupRoutes = require("./routes/lookups");
@@ -18,42 +19,51 @@ const feedbackRoutes = require("./routes/feedback");
 const searchRoutes = require("./routes/search");
 const { validateOrigin } = require("./middleware/csrf");
 const logger = require("./middleware/logger");
-const pinoHttp = require("pino-http");
+const requestIdMiddleware = require("./middleware/requestId");
+const errorHandler = require("./middleware/errorHandler");
+const notFound = require("./middleware/notFound");
+const { getAppRuntimeConfig } = require("./config/runtime");
 
 const db = require("./db");
 
 const app = express();
+const runtime = getAppRuntimeConfig();
 
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
 }));
 
-const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:30010";
+app.set("trust proxy", runtime.trustProxy ? 1 : false);
+
+const allowedOrigin = runtime.frontendUrl || "http://localhost:30010";
 app.use(cors({
     origin: allowedOrigin,
     credentials: true,
 }));
 
-app.use(express.json({ limit: '512kb' }));
+app.use(requestIdMiddleware);
 
-const sessionSecret = process.env.SESSION_SECRET;
-if (!sessionSecret) {
-    if (process.env.NODE_ENV === "production") {
-        throw new Error("SESSION_SECRET environment variable is required in production");
-    }
-    console.warn("WARNING: Using default session secret. Set SESSION_SECRET in .env for production.");
-}
+app.use(pinoHttp({
+    logger,
+    autoLogging: runtime.envName !== "test",
+    genReqId: (req) => req.id,
+    customProps: (req) => ({
+        requestId: req.id,
+    }),
+}));
+
+app.use(express.json({ limit: '512kb' }));
 
 app.use(
     session({
-        secret: sessionSecret || "dev-only-insecure-secret",
+        secret: runtime.sessionSecret,
         resave: false,
         saveUninitialized: false,
         cookie: {
             httpOnly: true,
             sameSite: "lax",
-            secure: process.env.COOKIE_SECURE === "true" || process.env.NODE_ENV === "production",
+            secure: runtime.cookieSecure,
             maxAge: 24 * 60 * 60 * 1000,
         },
     })
@@ -61,26 +71,41 @@ app.use(
 
 app.use(validateOrigin);
 
-app.use(pinoHttp({ logger, autoLogging: process.env.NODE_ENV !== "test" }));
-
 app.get('/api/health', async (req, res) => {
-  let database = "disconnected";
-  try {
-    await db.query("SELECT 1");
-    database = "connected";
-  } catch {
-    // intentionally ignored — database is unreachable
-  }
-  const status = database === "connected" ? "ok" : "degraded";
-  res.status(status === "ok" ? 200 : 503).json({
-    status,
-    database,
+  res.json({
+    status: "ok",
+    uptime: process.uptime(),
     timestamp: new Date().toISOString(),
+    requestId: req.id,
   });
 });
 
+app.get("/api/ready", async (req, res) => {
+  try {
+    await db.query("SELECT 1 AS health");
+    res.status(200).json({
+      status: "ok",
+      database: "connected",
+      timestamp: new Date().toISOString(),
+      requestId: req.id,
+    });
+  } catch (error) {
+    logger.warn({ err: error.message, requestId: req.id }, "Readiness check failed");
+    res.status(503).json({
+      status: "degraded",
+      database: "disconnected",
+      timestamp: new Date().toISOString(),
+      requestId: req.id,
+    });
+  }
+});
+
 app.get('/api', (req, res) => {
-  res.json({ status: "ok", message: 'Hello from the backend, IT IS RUNNING :)!' });
+  res.json({
+    status: "ok",
+    message: "Hello from the backend, IT IS RUNNING :)!",
+    requestId: req.id,
+  });
 });
 
 app.use("/api/auth", authRoutes);
@@ -94,6 +119,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/bookmarks", bookmarksRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/search", searchRoutes);
+app.use("/api", notFound);
 
 const reactBuildPath = path.join(__dirname, './dist');
 if (fs.existsSync(reactBuildPath)) {
@@ -103,16 +129,6 @@ if (fs.existsSync(reactBuildPath)) {
     });
 }
 
-// Global error handler — catches errors from non-catchAsync middleware
-// and prevents Express default HTML error page (which leaks stack traces)
-app.use((err, req, res, _next) => {
-    const status = err.status || err.statusCode;
-    if (status) {
-        logger.warn({ err: err.message }, "Client error");
-        return res.status(status).json({ error: err.message });
-    }
-    logger.error({ err: err.message }, "Unhandled middleware error");
-    res.status(500).json({ error: "Internal server error" });
-});
+app.use(errorHandler);
 
 module.exports = app;

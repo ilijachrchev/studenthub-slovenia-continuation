@@ -1,62 +1,43 @@
-const http = require("http");
+const request = require("supertest");
+const app = require("../app");
+const pool = require("../db");
 
-// We test the health endpoint by importing server.js and making
-// an HTTP request. To avoid port conflicts, we start the server
-// on a random port.
+describe("health and readiness", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-let server;
-let port;
+  test("GET /api/health returns a liveness response with request id", async () => {
+    const res = await request(app).get("/api/health");
 
-beforeAll((done) => {
-    // Set minimal env vars so the server can start without a real DB
-    process.env.SESSION_SECRET = "test-secret";
-    process.env.FRONTEND_URL = "http://localhost:30010";
-    process.env.DB_HOST = "localhost";
-    process.env.DB_USER = "test";
-    process.env.DB_PASS = "test";
-    process.env.DB_DATABASE = "test";
-    process.env.DB_PORT = "5433";
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("ok");
+    expect(res.body.timestamp).toBeDefined();
+    expect(res.body.requestId).toBeDefined();
+    expect(res.headers["x-request-id"]).toBe(res.body.requestId);
+  });
 
-    // Require server (it calls app.listen on PORT 30011)
-    // Instead of requiring server.js (which binds to 30011),
-    // we test the Express app directly.
-    // Since server.js has side effects, we test via HTTP against
-    // the already-running server or skip if port is occupied.
-    // For a unit test, we just verify the route exists.
-    done();
-});
+  test("GET /api/ready returns ready when the database query succeeds", async () => {
+    jest.spyOn(pool, "query").mockResolvedValue({ rows: [{ health: 1 }] });
 
-afterAll(() => {
-    if (server) server.close();
-});
+    const res = await request(app).get("/api/ready");
 
-describe("GET /api/health", () => {
-    test("health endpoint returns ok status and timestamp", async () => {
-        // Import Express app by creating a minimal test
-        // Since server.js starts listening on require, we test the response shape
-        // by making a request to the running server.
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("ok");
+    expect(res.body.database).toBe("connected");
+    expect(res.body.requestId).toBeDefined();
+    expect(res.headers["x-request-id"]).toBe(res.body.requestId);
+  });
 
-        // For a clean unit test without DB, we test the route logic directly.
-        const express = require("express");
-        const app = express();
+  test("GET /api/ready returns degraded when the database is unavailable", async () => {
+    jest.spyOn(pool, "query").mockRejectedValue(new Error("database unavailable"));
 
-        app.get("/api/health", (req, res) => {
-            res.json({ status: "ok", timestamp: new Date().toISOString() });
-        });
+    const res = await request(app).get("/api/ready");
 
-        await new Promise((resolve) => {
-            server = app.listen(0, () => {
-                port = server.address().port;
-                resolve();
-            });
-        });
-
-        const response = await fetch(`http://localhost:${port}/api/health`);
-        const data = await response.json();
-
-        expect(response.status).toBe(200);
-        expect(data.status).toBe("ok");
-        expect(data.timestamp).toBeDefined();
-        expect(new Date(data.timestamp).toISOString()).toBe(data.timestamp);
-    });
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe("degraded");
+    expect(res.body.database).toBe("disconnected");
+    expect(res.body.requestId).toBeDefined();
+    expect(res.headers["x-request-id"]).toBe(res.body.requestId);
+  });
 });

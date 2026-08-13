@@ -38,6 +38,13 @@ const REQUIRED_TABLES = [
   "bookmark",
   "registration",
   "feedback",
+  "opportunity",
+  "application",
+  "application_history",
+  "notification_preferences",
+  "notification",
+  "opportunity_tag",
+  "opportunity_bookmark",
 ];
 
 describe("Migration lifecycle", () => {

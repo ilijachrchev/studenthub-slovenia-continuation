@@ -16,6 +16,11 @@ describe("opportunity status machine", () => {
   test("rejects disallowed transitions", () => {
     expect(() => assertTransition("accepted", "pending", "organizer")).toThrow(/not allowed/);
     expect(() => assertTransition("pending", "withdrawn", "organizer")).toThrow(/not allowed/);
+    expect(() => assertTransition("pending", "accepted", "student")).toThrow(/not allowed/);
+  });
+
+  test("rejects unsupported roles", () => {
+    expect(() => assertTransition("pending", "under_review", "guest")).toThrow(/Unsupported role/);
   });
 
   test("allows organizer and student transitions that are supported", () => {

@@ -133,6 +133,17 @@ describe("Opportunity lifecycle backend", () => {
     expect(ownerListRes.body.opportunities.some((item) => item.id === transitionOpportunityId)).toBe(true);
   });
 
+  test("opportunity lifecycle rejects invalid transitions and non-owner access", async () => {
+    const secondSubmit = await organizerAgent.post(`/api/organizer/opportunities/${transitionOpportunityId}/submit`);
+    expect(secondSubmit.status).toBe(400);
+
+    const closeByOther = await otherOrganizerAgent.post(`/api/organizer/opportunities/${transitionOpportunityId}/close`);
+    expect(closeByOther.status).toBe(404);
+
+    const archiveByOther = await otherOrganizerAgent.post(`/api/organizer/opportunities/${transitionOpportunityId}/archive`);
+    expect(archiveByOther.status).toBe(404);
+  });
+
   test("non-owner organizer cannot access another organizer's opportunity", async () => {
     const res = await otherOrganizerAgent.get(`/api/organizer/opportunities/${transitionOpportunityId}/applicants`);
     expect(res.status).toBe(404);
@@ -172,6 +183,12 @@ describe("Opportunity lifecycle backend", () => {
     const applicationsRes = await studentAgent.get("/api/opportunities/applications");
     expect(applicationsRes.status).toBe(200);
     expect(applicationsRes.body.applications.some((item) => item.id === applicationId)).toBe(true);
+
+    const historyRes = await studentAgent.get(`/api/opportunities/${applicationId}/history`);
+    expect(historyRes.status).toBe(200);
+    expect(historyRes.body.applicationId).toBe(applicationId);
+    expect(Array.isArray(historyRes.body.history)).toBe(true);
+    expect(historyRes.body.history.length).toBeGreaterThan(0);
   });
 
   test("organizer applicant transitions are concurrency safe", async () => {
@@ -207,6 +224,11 @@ describe("Opportunity lifecycle backend", () => {
 
     const secondWithdrawRes = await studentAgent.delete(`/api/opportunities/${withdrawOpportunityId}/apply`);
     expect(secondWithdrawRes.status).toBe(404);
+  });
+
+  test("withdrawal on another student's application remains hidden", async () => {
+    const res = await otherOrganizerAgent.delete(`/api/opportunities/${withdrawOpportunityId}/apply`);
+    expect(res.status).toBe(403);
   });
 
   test("organizer analytics returns derived summary", async () => {

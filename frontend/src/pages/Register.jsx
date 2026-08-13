@@ -2,9 +2,12 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "./css/Register.css";
 import { GraduationCap, Building, CheckCircle, ChevronRight } from "../components/reusable/Icons";
+import { apiRequest, getApiErrorMessage } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 
 function Register() {
   const navigate = useNavigate();
+  const { refreshUser } = useAuth();
 
   const [role, setRole] = useState("student");
   const [firstName, setFirstName] = useState("");
@@ -19,33 +22,26 @@ function Register() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/register", {
+      await apiRequest("/api/auth/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           first_name: firstName,
           last_name: lastName,
           email,
           password,
           role,
-        }),
+        },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error);
-        setLoading(false);
-        return;
-      }
+      await refreshUser({ silent: true });
 
       if (role === "organizer") {
         navigate("/setup-organization");
       } else {
         navigate("/setup-feed");
       }
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (error) {
+      setError(getApiErrorMessage(error, "Something went wrong. Please try again."));
       setLoading(false);
     }
   };

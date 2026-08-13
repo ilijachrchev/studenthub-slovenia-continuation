@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import PendingEventCard from "../../components/admin/PendingEventCard";
 import RejectModal from "../../components/admin/RejectModal";
 import "./css/PendingEvents.css";
+import { apiRequest } from "../../lib/api";
 
 function PendingEvents() {
     const [events, setEvents] = useState([]);
@@ -11,13 +12,7 @@ function PendingEvents() {
     const [actionLoading, setActionLoading] = useState(false);
 
     const loadPending = useCallback(async () => {
-        const res = await fetch("/api/admin/events/pending", {credentials: "include"});
-        if (!res.ok) {
-            const data = await res.json();
-            setError(data.error || "Failed to load pending events");
-            return;
-        }
-        const data = await res.json();
+        const data = await apiRequest("/api/admin/events/pending");
         setEvents(data.events);
     }, []);
 
@@ -37,15 +32,9 @@ function PendingEvents() {
     const handleApprove = async (id) => {
         setError("");
         try {
-            const res = await fetch(`/api/admin/events/${id}/approve`, {
+            await apiRequest(`/api/admin/events/${id}/approve`, {
                 method: "POST",
-                credentials: "include",
             });
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.error || "Failed to approve event");
-                return;
-            }
             await loadPending();
         } catch {
             setError("Something went wrong. Please try again")
@@ -57,18 +46,10 @@ function PendingEvents() {
         setActionLoading(true);
         setError("");
         try {
-            const res = await fetch(`/api/admin/events/${rejectingEvent.id}/reject`, {
+            await apiRequest(`/api/admin/events/${rejectingEvent.id}/reject`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json"},
-                credentials: "include",
-                body: JSON.stringify({reason}),
+                body: { reason },
             });
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.error || "Failed to reject event");
-                setActionLoading(false);
-                return;
-            }
             setActionLoading(false);
             setRejectingEvent(null);
             await loadPending();

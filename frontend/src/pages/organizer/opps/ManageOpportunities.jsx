@@ -5,6 +5,7 @@ import OpportunityCard from "../../../components/organizer/opps/OpportunityCard"
 import OpportunityForm from "../../../components/organizer/opps/OpportunityForm";
 import StatusBadge from "../../../components/shared/StatusBadge";
 import "./ManageOpportunities.css";
+import { apiRequest } from "../../../lib/api";
 
 const EMPTY_OPPORTUNITY = null;
 
@@ -33,12 +34,7 @@ function ManageOpportunities() {
   const [selectedOpportunity, setSelectedOpportunity] = useState(EMPTY_OPPORTUNITY);
 
   const loadOpportunities = useCallback(async () => {
-    const res = await fetch("/api/organizer/opportunities", { credentials: "include" });
-    if (!res.ok) {
-      const data = await safeJson(res);
-      throw new Error(data.error || "Failed to load opportunities.");
-    }
-    const data = await res.json();
+    const data = await apiRequest("/api/organizer/opportunities");
     setOpportunities((data.opportunities || data.items || []).map(normalizeOpportunity));
   }, []);
 
@@ -78,17 +74,10 @@ function ManageOpportunities() {
     setActionError("");
     try {
       const isEdit = Boolean(selectedOpportunity?.id);
-      const res = await fetch(isEdit ? `/api/organizer/opportunities/${selectedOpportunity.id}` : "/api/organizer/opportunities", {
+      await apiRequest(isEdit ? `/api/organizer/opportunities/${selectedOpportunity.id}` : "/api/organizer/opportunities", {
         method: isEdit ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
+        body: payload,
       });
-      if (!res.ok) {
-        const data = await safeJson(res);
-        setActionError(data.error || "Unable to save opportunity.");
-        return;
-      }
       await loadOpportunities();
       resetForm();
     } catch {
@@ -101,15 +90,9 @@ function ManageOpportunities() {
   const runAction = async (opportunity, endpoint, method = "POST") => {
     setActionError("");
     try {
-      const res = await fetch(`/api/organizer/opportunities/${opportunity.id}/${endpoint}`, {
+      await apiRequest(`/api/organizer/opportunities/${opportunity.id}/${endpoint}`, {
         method,
-        credentials: "include",
       });
-      if (!res.ok) {
-        const data = await safeJson(res);
-        setActionError(data.error || `Failed to ${endpoint} opportunity.`);
-        return;
-      }
       await loadOpportunities();
     } catch {
       setActionError("Something went wrong. Please try again.");

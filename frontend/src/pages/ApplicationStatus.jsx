@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { GraduationCap } from "../components/reusable/Icons";
 import "./css/SetupFeed.css";
+import { apiRequest } from "../lib/api";
 
 function ApplicationStatus() {
   const navigate = useNavigate();
@@ -13,17 +14,7 @@ function ApplicationStatus() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/organizations/my-application", {
-          credentials: "include",
-        });
-
-        if (!res.ok) {
-          const data = await res.json();
-          setError(data.error || "Failed to load application status");
-          return;
-        }
-
-        const data = await res.json();
+        const data = await apiRequest("/api/organizations/my-application");
         setHasApplication(data.hasApplication);
         setOrganization(data.organization || null);
       } catch {

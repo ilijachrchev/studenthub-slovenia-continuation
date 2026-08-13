@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import ApplicationStatusBadge from "../../components/opportunities/ApplicationStatusBadge";
 import OpportunityCard from "../../components/opportunities/OpportunityCard";
 import {
@@ -8,15 +8,17 @@ import {
   isPastDate,
   normaliseOpportunity,
   normaliseOpportunityList,
-  unwrapMessage,
 } from "../../components/opportunities/opportunitiesUtils";
 import { useAuth } from "../../context/AuthContext";
 import "./css/opportunities.css";
+import { apiRequest, getApiErrorMessage, isApiError } from "../../lib/api";
+import { buildLoginPath } from "../../lib/auth";
 
 function OpportunityDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const location = useLocation();
+  const { user, loading: authLoading, markSessionExpired, sessionExpired } = useAuth();
 
   const [opportunity, setOpportunity] = useState(null);
   const [related, setRelated] = useState([]);
@@ -33,29 +35,20 @@ function OpportunityDetail() {
     async function loadOpportunity() {
       try {
         const [detailRes, relatedRes, savedRes] = await Promise.all([
-          fetch(`/api/opportunities/${id}`, { credentials: "include" }),
-          fetch(`/api/opportunities/${id}/related`, { credentials: "include" }),
-          fetch("/api/opportunities/saved/ids", { credentials: "include" }),
+          apiRequest(`/api/opportunities/${id}`),
+          apiRequest(`/api/opportunities/${id}/related`),
+          apiRequest("/api/opportunities/saved/ids"),
         ]);
-
-        const detailData = await detailRes.json().catch(() => ({}));
-        const relatedData = await relatedRes.json().catch(() => ({}));
-        const savedData = await savedRes.json().catch(() => ({}));
 
         if (!alive) return;
 
-        if (!detailRes.ok) {
-          setError(unwrapMessage(detailData, "Failed to load opportunity"));
-          return;
-        }
-
-        const item = normaliseOpportunity(detailData.opportunity ?? detailData);
+        const item = normaliseOpportunity(detailRes.opportunity ?? detailRes);
         setOpportunity(item);
-        setRelated(normaliseOpportunityList(relatedData).slice(0, 3));
+        setRelated(normaliseOpportunityList(relatedRes).slice(0, 3));
         setSaved(
-          Array.isArray(savedData)
-            ? savedData.some((savedId) => String(savedId) === String(item.id))
-            : (savedData.ids || []).some((savedId) => String(savedId) === String(item.id))
+          Array.isArray(savedRes)
+            ? savedRes.some((savedId) => String(savedId) === String(item.id))
+            : (savedRes.ids || []).some((savedId) => String(savedId) === String(item.id))
         );
         setApplyState(item.applicationStatus || item.application?.status || "");
         dispatchAnalytics("opportunity_view", {
@@ -89,14 +82,9 @@ function OpportunityDetail() {
     });
 
     try {
-      const response = await fetch(`/api/opportunities/${opportunity.id}/bookmark`, {
+      await apiRequest(`/api/opportunities/${opportunity.id}/bookmark`, {
         method: nextSaved ? "POST" : "DELETE",
-        credentials: "include",
       });
-
-      if (!response.ok) {
-        throw new Error("save-failed");
-      }
     } catch {
       setSaved(!nextSaved);
     }
@@ -116,7 +104,12 @@ function OpportunityDetail() {
     if (authLoading) return;
 
     if (!user) {
-      navigate(`/login?next=${encodeURIComponent(`/opportunities/${opportunity.id}`)}`);
+      navigate(
+        buildLoginPath({
+          next: `${location.pathname}${location.search}`,
+          reason: sessionExpired ? "session-expired" : undefined,
+        }),
+      );
       return;
     }
 
@@ -134,37 +127,39 @@ function OpportunityDetail() {
     setError("");
 
     try {
-      const response = await fetch(`/api/opportunities/${opportunity.id}/apply`, {
+      const data = await apiRequest(`/api/opportunities/${opportunity.id}/apply`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ cover_note: coverNote, coverNote }),
+        body: { cover_note: coverNote, coverNote },
       });
-      const data = await response.json().catch(() => ({}));
-
-      if (response.status === 401 || response.status === 403) {
-        navigate(`/login?next=${encodeURIComponent(`/opportunities/${opportunity.id}`)}`);
+      setApplyState(data.status || data.application?.status || "submitted");
+      dispatchAnalytics("opportunity_applied", {
+        opportunityId: opportunity.id,
+        title: opportunity.title,
+      });
+    } catch (error) {
+      if (isApiError(error) && error.status === 401) {
+        markSessionExpired();
+        navigate(
+          buildLoginPath({
+            next: `${location.pathname}${location.search}`,
+            reason: "session-expired",
+          }),
+        );
         return;
       }
 
-      if (response.status === 409 || data.alreadyApplied) {
+      if (isApiError(error) && error.status === 403) {
+        setError(error.message || "You are not allowed to apply for this opportunity.");
+        return;
+      }
+
+      if (isApiError(error) && error.status === 409) {
         setApplyState("applied");
         setError("You have already applied for this opportunity.");
         return;
       }
 
-      if (!response.ok) {
-        setError(unwrapMessage(data, "Failed to submit application"));
-        return;
-      }
-
-      setApplyState(data.status || "submitted");
-      dispatchAnalytics("opportunity_applied", {
-        opportunityId: opportunity.id,
-        title: opportunity.title,
-      });
-    } catch {
-      setError("Failed to submit application");
+      setError(getApiErrorMessage(error, "Failed to submit application"));
     } finally {
       setApplying(false);
     }

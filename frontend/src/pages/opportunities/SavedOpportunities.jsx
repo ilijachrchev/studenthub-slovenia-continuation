@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import OpportunityCard from "../../components/opportunities/OpportunityCard";
-import { normaliseOpportunityList, unwrapMessage } from "../../components/opportunities/opportunitiesUtils";
+import { normaliseOpportunityList } from "../../components/opportunities/opportunitiesUtils";
 import "./css/opportunities.css";
+import { apiRequest } from "../../lib/api";
 
 function SavedOpportunities() {
   const [opportunities, setOpportunities] = useState([]);
@@ -13,18 +14,8 @@ function SavedOpportunities() {
 
     async function loadSaved() {
       try {
-        const response = await fetch("/api/opportunities/saved", {
-          credentials: "include",
-        });
-        const data = await response.json().catch(() => ({}));
-
+        const data = await apiRequest("/api/opportunities/saved");
         if (!alive) return;
-
-        if (!response.ok) {
-          setError(unwrapMessage(data, "Failed to load saved opportunities"));
-          return;
-        }
-
         setOpportunities(normaliseOpportunityList(data));
       } catch {
         if (alive) setError("Failed to load saved opportunities");
@@ -45,14 +36,9 @@ function SavedOpportunities() {
     setOpportunities((current) => current.filter((item) => item.id !== opportunity.id));
 
     try {
-      const response = await fetch(`/api/opportunities/${opportunity.id}/bookmark`, {
+      await apiRequest(`/api/opportunities/${opportunity.id}/bookmark`, {
         method: "DELETE",
-        credentials: "include",
       });
-
-      if (!response.ok) {
-        throw new Error("save-failed");
-      }
     } catch {
       setOpportunities(previous);
     }

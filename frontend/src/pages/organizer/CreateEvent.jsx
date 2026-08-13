@@ -5,6 +5,7 @@ import EventTimeLocation from "../../components/organizer/EventTimeLocation";
 import EventRegistrationType from "../../components/organizer/EventRegistrationType";
 import ChipMultiSelect from "../../components/organizer/ChipMultiSelect";
 import "./css/CreateEvent.css";
+import { apiRequest } from "../../lib/api";
 
 function CreateEvent() {
     const navigate = useNavigate()
@@ -30,11 +31,11 @@ function CreateEvent() {
         async function loadData() {
             try {
                 const [facultiesRes, tagsRes] = await Promise.all([
-                    fetch("/api/faculties"),
-                    fetch("/api/tags"),
+                    apiRequest("/api/faculties"),
+                    apiRequest("/api/tags"),
                 ]);
-                setFaculties(await facultiesRes.json());
-                setTags(await tagsRes.json());
+                setFaculties(facultiesRes);
+                setTags(tagsRes);
             } catch {
                 setError("Failed to load faculties and tags");
             }
@@ -74,11 +75,9 @@ function CreateEvent() {
         
     const createEvent = async () => {
         try {
-            const res = await fetch("/api/organizer/events", {
+            const data = await apiRequest("/api/organizer/events", {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
-                credentials: "include",
-                body: JSON.stringify({
+                body: {
                     title, description, location,
                     start_datetime: startDatetime,
                     end_datetime: endDatetime,
@@ -87,15 +86,8 @@ function CreateEvent() {
                     external_url: registrationType === "external" ? externalUrl : null,
                     tag_ids: selectedTags,
                     target_faculty_ids: selectedFaculties,
-                }),
+                },
             });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                setError(data.error || "Failed to create event");
-                return null;
-            }
 
             return data.eventId;
         } catch {
@@ -129,16 +121,9 @@ function CreateEvent() {
         }
 
         try {
-            const res = await fetch(`/api/organizer/events/${id}/submit`, {
+            await apiRequest(`/api/organizer/events/${id}/submit`, {
                 method: "POST",
-                credentials: "include",
             });
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.error || "Created as draft, but coudn't submit it");
-                setLoading(false);
-                return;
-            }
             navigate("/organizer");
         } catch {
             setError("Created as draft, but coulnd't submit it");

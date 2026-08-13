@@ -3,6 +3,7 @@ const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
 const logger = require("../middleware/logger");
 const { requireRole } = require("../middleware/auth");
+const { transitionOpportunity } = require("../lib/opportunity/lifecycle");
 
 const router = express.Router();
 
@@ -132,6 +133,87 @@ router.post("/organizations/:id/reject", requireAdmin, catchAsync(async (req, re
     }
 
     res.json({ message: "Organization rejected" });
+}));
+
+// /api/admin/opportunities/pending GET method
+router.get("/opportunities/pending", requireAdmin, catchAsync(async (req, res) => {
+
+    const { rows: opportunities } = await pool.query(
+        `SELECT o.id, o.title, o.description, o.type, o.location,
+                o.is_remote, o.application_mode, o.external_url, o.compensation,
+                o.capacity, o.application_deadline, o.starts_at, o.status,
+                org.id AS organization_id, org.name AS organization_name,
+                c.id AS category_id, c.name AS category_name, c.slug AS category_slug
+         FROM opportunity o
+         JOIN organization org ON org.id = o.organization_id
+         LEFT JOIN opportunity_category c ON c.id = o.category_id
+         WHERE o.status = 'submitted'
+         ORDER BY o.created_at ASC, o.id ASC`
+    );
+
+    res.json({ opportunities });
+}));
+
+// /api/admin/opportunities/:id/approve POST method
+router.post("/opportunities/:id/approve", requireAdmin, catchAsync(async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        await transitionOpportunity(client, {
+            opportunityId: req.params.id,
+            actorUserId: req.session.user.id,
+            actorRole: req.session.user.role,
+            toStatus: "published",
+            requireOwnership: false,
+        });
+
+        await client.query("COMMIT");
+        res.json({ message: "Opportunity published" });
+    } catch (error) {
+        await client.query("ROLLBACK");
+        if (error.status) {
+            return res.status(error.status).json({ error: error.message });
+        }
+        logger.error({ err: error }, "Opportunity approval failed");
+        res.status(500).json({ error: "Internal server error" });
+    } finally {
+        client.release();
+    }
+}));
+
+// /api/admin/opportunities/:id/reject POST method
+router.post("/opportunities/:id/reject", requireAdmin, catchAsync(async (req, res) => {
+    const { reason } = req.body;
+    if (!reason || !String(reason).trim()) {
+        return res.status(400).json({ error: "Rejection reason is required" });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        await transitionOpportunity(client, {
+            opportunityId: req.params.id,
+            actorUserId: req.session.user.id,
+            actorRole: req.session.user.role,
+            toStatus: "rejected",
+            reason: String(reason).trim(),
+            requireOwnership: false,
+        });
+
+        await client.query("COMMIT");
+        res.json({ message: "Opportunity rejected" });
+    } catch (error) {
+        await client.query("ROLLBACK");
+        if (error.status) {
+            return res.status(error.status).json({ error: error.message });
+        }
+        logger.error({ err: error }, "Opportunity rejection failed");
+        res.status(500).json({ error: "Internal server error" });
+    } finally {
+        client.release();
+    }
 }));
 
 

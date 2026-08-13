@@ -44,6 +44,9 @@ module.exports = async function globalSetup() {
       { table: '"user"', column: "id" },
       { table: "organization", column: "id" },
       { table: "event", column: "id" },
+      { table: "opportunity_category", column: "id" },
+      { table: "opportunity", column: "id" },
+      { table: "opportunity_status_history", column: "id" },
     ];
     for (const { table, column } of tablesToReset) {
       const seqName = table.replace(/"/g, "") + "_" + column + "_seq";

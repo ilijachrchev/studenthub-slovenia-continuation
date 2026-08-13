@@ -23,6 +23,10 @@ const REQUIRED_TABLES = [
   "bookmark",
   "registration",
   "feedback",
+  "opportunity_category",
+  "opportunity",
+  "opportunity_tag",
+  "opportunity_status_history",
 ];
 
 const REQUIRED_INDEXES = [
@@ -34,6 +38,11 @@ const REQUIRED_INDEXES = [
   { table: "registration", index: "idx_registration_event" },
   { table: "event", index: "idx_event_status_start" },
   { table: "event", index: "idx_event_org_status" },
+  { table: "opportunity", index: "idx_opportunity_status" },
+  { table: "opportunity", index: "idx_opportunity_published_at" },
+  { table: "opportunity", index: "idx_opportunity_org_status" },
+  { table: "opportunity", index: "idx_opportunity_category" },
+  { table: "opportunity_status_history", index: "idx_opportunity_status_history_opportunity" },
 ];
 
 async function verify() {

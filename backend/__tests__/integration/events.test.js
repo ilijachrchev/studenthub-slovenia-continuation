@@ -3,7 +3,7 @@ const app = require("../../app");
 const pool = require("../../db");
 
 afterAll(async () => {
-  await pool.end();
+  // Leave pool lifecycle to Jest global teardown; other integration files share this client.
 });
 
 describe("GET /api/events", () => {

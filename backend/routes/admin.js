@@ -3,6 +3,11 @@ const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
 const logger = require("../middleware/logger");
 const { requireRole } = require("../middleware/auth");
+const { adminLimiter } = require("../middleware/rateLimits");
+const {
+    parsePositiveInteger,
+    validateRejectionReasonInput,
+} = require("../validators/input");
 
 const router = express.Router();
 
@@ -25,11 +30,14 @@ router.get("/events/pending", requireAdmin, catchAsync(async (req, res) => {
 }));
 
 // /api/admin/events/:id/approve POST method
-router.post("/events/:id/approve", requireAdmin, catchAsync(async (req, res) => {
-
+router.post("/events/:id/approve", requireAdmin, adminLimiter, catchAsync(async (req, res) => {
+    const eventId = parsePositiveInteger(req.params.id);
+    if (!eventId) {
+        return res.status(400).json({ error: "Event not found or not awaiting approval" });
+    }
     const { rowCount } = await pool.query(
         "UPDATE event SET status = 'published' WHERE id = $1 AND status = 'submitted'",
-        [req.params.id]
+        [eventId]
     );
 
     if (rowCount === 0) {
@@ -40,10 +48,14 @@ router.post("/events/:id/approve", requireAdmin, catchAsync(async (req, res) => 
 }));
 
 // /api/admin/events/:id/rejected POST method
-router.post("/events/:id/reject", requireAdmin, catchAsync(async (req, res) => {
+router.post("/events/:id/reject", requireAdmin, adminLimiter, catchAsync(async (req, res) => {
+    const eventId = parsePositiveInteger(req.params.id);
+    if (!eventId) {
+        return res.status(400).json({ error: "Event not found or not awaiting approval" });
+    }
 
-    const {reason} = req.body;
-    if (!reason || !reason.trim()) {
+    const validation = validateRejectionReasonInput(req.body);
+    if (validation.errors.length > 0) {
         return res.status(400).json({ error: "Rejection reason is required" });
     }
 
@@ -63,7 +75,7 @@ router.post("/events/:id/reject", requireAdmin, catchAsync(async (req, res) => {
 
         const { rowCount } = await client.query(
             "UPDATE event SET status = 'rejected' WHERE id = $1 AND status = 'submitted'",
-            [req.params.id]
+            [eventId]
         );
 
         if (rowCount === 0) {
@@ -73,7 +85,7 @@ router.post("/events/:id/reject", requireAdmin, catchAsync(async (req, res) => {
 
         await client.query(
             "INSERT INTO event_rejection (event_id, admin_id, reason) VALUES ($1, $2, $3)",
-            [req.params.id, adminId, reason.trim()]
+            [eventId, adminId, validation.value.reason]
         );
 
         await client.query("COMMIT");
@@ -105,11 +117,14 @@ router.get("/organizations/pending", requireAdmin, catchAsync(async (req, res) =
 }));
 
 // /api/admin/organizations/:id/approve POST method
-router.post("/organizations/:id/approve", requireAdmin, catchAsync(async (req, res) => {
-
+router.post("/organizations/:id/approve", requireAdmin, adminLimiter, catchAsync(async (req, res) => {
+    const orgId = parsePositiveInteger(req.params.id);
+    if (!orgId) {
+        return res.status(400).json({ error: "Organization not found or not awaiting approval" });
+    }
     const { rowCount } = await pool.query(
         "UPDATE organization SET status = 'approved', approved_at = NOW() WHERE id = $1 AND status = 'pending'",
-        [req.params.id]
+        [orgId]
     );
 
     if (rowCount === 0) {
@@ -120,11 +135,14 @@ router.post("/organizations/:id/approve", requireAdmin, catchAsync(async (req, r
 }));
 
 // /api/admin/organizations/:id/reject POST method
-router.post("/organizations/:id/reject", requireAdmin, catchAsync(async (req, res) => {
-
+router.post("/organizations/:id/reject", requireAdmin, adminLimiter, catchAsync(async (req, res) => {
+    const orgId = parsePositiveInteger(req.params.id);
+    if (!orgId) {
+        return res.status(400).json({ error: "Organization not found or not awaiting approval" });
+    }
     const { rowCount } = await pool.query(
         "UPDATE organization SET status = 'rejected' WHERE id = $1 AND status = 'pending'",
-        [req.params.id]
+        [orgId]
     );
 
     if (rowCount === 0) {

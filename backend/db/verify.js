@@ -23,6 +23,7 @@ const REQUIRED_TABLES = [
   "bookmark",
   "registration",
   "feedback",
+  "session",
 ];
 
 const REQUIRED_INDEXES = [
@@ -34,6 +35,7 @@ const REQUIRED_INDEXES = [
   { table: "registration", index: "idx_registration_event" },
   { table: "event", index: "idx_event_status_start" },
   { table: "event", index: "idx_event_org_status" },
+  { table: "session", index: "idx_session_expire" },
 ];
 
 async function verify() {

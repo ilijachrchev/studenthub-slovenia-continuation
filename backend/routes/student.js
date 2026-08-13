@@ -3,20 +3,23 @@ const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
 const logger = require("../middleware/logger");
 const { requireRole } = require("../middleware/auth");
+const { studentProfileLimiter } = require("../middleware/rateLimits");
+const {
+    validateStudentProfileInput,
+} = require("../validators/input");
 
 const router = express.Router();
 
 const requireStudent = requireRole("student");
 
 // /api/student/setup POST method
-router.post("/setup", requireStudent, catchAsync(async (req, res) => {
+router.post("/setup", requireStudent, studentProfileLimiter, catchAsync(async (req, res) => {
     const userId = req.session.user.id;
-
-    const { faculty_id, study_year, tag_ids } = req.body;
-
-    if (!faculty_id) {
-        return res.status(400).json({ error: "Faculty is required"});
+    const validation = validateStudentProfileInput(req.body);
+    if (validation.errors.length > 0) {
+        return res.status(400).json({ error: validation.errors[0] });
     }
+    const { faculty_id, study_year, tag_ids } = validation.value;
 
     const { rows: existing } = await pool.query(
         "SELECT * FROM student_profile WHERE user_id = $1",
@@ -84,14 +87,13 @@ router.get("/profile", requireStudent, catchAsync(async (req, res) => {
 
 
 // /api/student/profile PUT method
-router.put("/profile", requireStudent, catchAsync(async (req, res) => {
+router.put("/profile", requireStudent, studentProfileLimiter, catchAsync(async (req, res) => {
     const userId = req.session.user.id;
-
-    const { faculty_id, study_year, tag_ids} = req.body;
-
-    if (!faculty_id) {
-        return res.status(400).json({error: "Faculty is required"});
+    const validation = validateStudentProfileInput(req.body);
+    if (validation.errors.length > 0) {
+        return res.status(400).json({ error: validation.errors[0] });
     }
+    const { faculty_id, study_year, tag_ids } = validation.value;
 
     const client = await pool.connect();
 

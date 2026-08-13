@@ -1,17 +1,41 @@
 const express = require("express");
 const pool = require("../db");
-const { validateEvent } = require("../middleware/validate");
 const catchAsync = require("../middleware/catchAsync");
 const logger = require("../middleware/logger");
 const { requireRole } = require("../middleware/auth");
+const { organizerEventLimiter } = require("../middleware/rateLimits");
+const {
+    validateEventInput,
+    parsePositiveInteger,
+} = require("../validators/input");
 
 const router = express.Router();
 
 const requireOrganizer = requireRole("organizer");
 
+async function getOwnedOrganizationId(client, userId) {
+    const { rows } = await client.query(
+        `SELECT o.id
+         FROM organization o
+         JOIN organizer_profile op ON op.organization_id = o.id
+         WHERE op.user_id = $1
+           AND op.role_in_org = 'owner'
+           AND o.status = 'approved'
+         ORDER BY o.id ASC
+         LIMIT 1`,
+        [userId]
+    );
+
+    return rows[0] ? rows[0].id : null;
+}
+
 
 // /api/organizer/events GET method
 router.get("/events", requireOrganizer, catchAsync(async (req, res) => {
+    const organizationId = await getOwnedOrganizationId(pool, req.session.user.id);
+    if (!organizationId) {
+        return res.status(403).json({ error: "No approved organization found for this account" });
+    }
 
     const { rows: events } = await pool.query(
         `SELECT e.id, e.title, e.description, e.location,
@@ -19,56 +43,66 @@ router.get("/events", requireOrganizer, catchAsync(async (req, res) => {
             e.registration_type, e.external_url, e.status, e.created_at
             FROM event e
             JOIN organizer_profile op ON op.organization_id = e.organization_id
+            JOIN organization o ON o.id = e.organization_id
             WHERE op.user_id = $1
+            AND op.role_in_org = 'owner'
+            AND o.status = 'approved'
+            AND e.organization_id = $2
             ORDER BY e.start_datetime DESC`,
-            [req.session.user.id]
+            [req.session.user.id, organizationId]
     );
 
     res.json({events});
 }));
 
 // /api/organizer/events POST method
-router.post("/events", requireOrganizer, catchAsync(async (req, res) => {
-
-    const { title, description, location, start_datetime, end_datetime,
-            registration_type, capacity, external_url, tag_ids, target_faculty_ids, } = req.body;
-
-    if (!title || !location || !start_datetime || !end_datetime) {
-        return res.status(400).json({error: "Title, location, start and end datetime are required"});
+router.post("/events", requireOrganizer, organizerEventLimiter, catchAsync(async (req, res) => {
+    const validation = validateEventInput(req.body);
+    if (validation.errors.length > 0) {
+        const firstError = validation.errors[0];
+        if (firstError === "Registration type must be one of: built_in, external, none") {
+            return res.status(400).json({error: "Registration type must be built_in, external, or none"});
+        }
+        if (firstError.startsWith("Tag IDs")) {
+            return res.status(400).json({error: "Select at least one tag"});
+        }
+        if (firstError.startsWith("Target faculty IDs")) {
+            return res.status(400).json({error: "Select at least one target faculty"});
+        }
+        if (
+            firstError.startsWith("Title") ||
+            firstError.startsWith("Location") ||
+            firstError.startsWith("Start datetime") ||
+            firstError.startsWith("End datetime")
+        ) {
+            return res.status(400).json({error: "Title, location, start and end datetime are required"});
+        }
+        return res.status(400).json({error: firstError});
     }
 
-    const validationErrors = validateEvent(req.body);
-    if (validationErrors.length > 0) {
-        return res.status(400).json({error: validationErrors[0]});
-    }
+    const {
+        title,
+        description,
+        location,
+        start_datetime,
+        end_datetime,
+        registration_type,
+        capacity,
+        external_url,
+        tag_ids,
+        target_faculty_ids,
+    } = validation.value;
 
-    if (!Array.isArray(tag_ids) || tag_ids.length === 0) {
-        return res.status(400).json({error: "Select at least one tag"});
-    }
-    if (!Array.isArray(target_faculty_ids) || target_faculty_ids.length === 0) {
-        return res.status(400).json({error: "Select at least one target faculty"});
-    }
-
-    const regType = ["built_in", "external", "none"].includes(registration_type)
-        ? registration_type
-        : "built_in";
+    const regType = registration_type || "built_in";
 
     if (regType === "external" && !external_url) {
         return res.status(400).json({error: "An external registration link is required"});
     }
 
-    const { rows: orgs } = await pool.query(
-        `SELECT o.id FROM organization o
-        JOIN organizer_profile op ON op.organization_id = o.id
-        WHERE op.user_id = $1 AND o.status = 'approved'`,
-        [req.session.user.id]
-    );
-
-    if (orgs.length === 0) {
+    const organizationId = await getOwnedOrganizationId(pool, req.session.user.id);
+    if (!organizationId) {
         return res.status(403).json({ error: "No approved organization found for this account"});
     }
-
-    const organizationId = orgs[0].id;
 
     const client = await pool.connect();
 
@@ -83,11 +117,11 @@ router.post("/events", requireOrganizer, catchAsync(async (req, res) => {
                 RETURNING id`,
                 [
                     organizationId, title,
-                    description || null,
+                    description,
                     location,
                     start_datetime.replace("T", " "),
                     end_datetime.replace("T", " "),
-                    regType === "built_in" ? (capacity || null) : null,
+                    regType === "built_in" ? capacity : null,
                     regType,
                     regType === "external" ? external_url : null,
                 ]
@@ -121,14 +155,17 @@ router.post("/events", requireOrganizer, catchAsync(async (req, res) => {
 }));
 
 // /api/organizer/events/:id POST method
-router.post("/events/:id/submit", requireOrganizer, catchAsync(async (req, res) => {
-
-    const eventId = req.params.id;
+router.post("/events/:id/submit", requireOrganizer, organizerEventLimiter, catchAsync(async (req, res) => {
+    const eventId = parsePositiveInteger(req.params.id);
+    if (!eventId) {
+        return res.status(404).json({error: "Event not found"});
+    }
 
     const { rows } = await pool.query(
         `SELECT e.id, e.status FROM event e
         JOIN organizer_profile op ON op.organization_id = e.organization_id
-        WHERE e.id = $1 AND op.user_id = $2`,
+        JOIN organization o ON o.id = e.organization_id
+        WHERE e.id = $1 AND op.user_id = $2 AND op.role_in_org = 'owner' AND o.status = 'approved'`,
         [eventId, req.session.user.id]
     );
     if (rows.length === 0) {

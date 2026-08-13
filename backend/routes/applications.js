@@ -2,8 +2,14 @@ const express = require("express");
 const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
 const { requireAuth, requireRole } = require("../middleware/auth");
+const { applicationLimiter } = require("../middleware/rateLimits");
 const { assertTransition, normalizeStatus } = require("../lib/opportunity/statusMachine");
 const { emit } = require("../lib/opportunity/notifications");
+const {
+  parsePositiveInteger,
+  validateCoverNoteInput,
+  validateApplicationTransitionInput,
+} = require("../validators/input");
 
 const router = express.Router();
 
@@ -12,8 +18,7 @@ function toIso(value) {
 }
 
 function parseId(value) {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : null;
+  return parsePositiveInteger(value);
 }
 
 async function getOpportunityOwner(client, opportunityId) {
@@ -48,15 +53,18 @@ async function getOpportunityForApplicant(client, opportunityId, userId) {
   return rows[0];
 }
 
-router.post("/:id/apply", requireAuth, requireRole("student"), catchAsync(async (req, res) => {
+router.post("/:id/apply", requireAuth, requireRole("student"), applicationLimiter, catchAsync(async (req, res) => {
   const opportunityId = parseId(req.params.id);
   if (!opportunityId) {
     return res.status(404).json({ error: "Opportunity not found" });
   }
 
-  const coverNote = typeof req.body.cover_note === "string" && req.body.cover_note.trim()
-    ? req.body.cover_note.trim()
-    : null;
+  const coverNoteValidation = validateCoverNoteInput(req.body);
+  if (coverNoteValidation.errors.length > 0) {
+    return res.status(400).json({ error: coverNoteValidation.errors[0] });
+  }
+
+  const coverNote = coverNoteValidation.value.cover_note;
 
   const client = await pool.connect();
   try {
@@ -193,18 +201,18 @@ router.get("/opportunities/:id/applications", requireAuth, requireRole("organize
   });
 }));
 
-router.post("/:id/transition", requireAuth, catchAsync(async (req, res) => {
+router.post("/:id/transition", requireAuth, applicationLimiter, catchAsync(async (req, res) => {
   const applicationId = parseId(req.params.id);
   if (!applicationId) {
     return res.status(404).json({ error: "Application not found" });
   }
 
-  const from = normalizeStatus(req.body.from_status || req.body.from || req.body.current_status);
-  const to = normalizeStatus(req.body.to_status || req.body.to || req.body.next_status);
-
-  if (!from || !to) {
-    return res.status(400).json({ error: "Both from and to statuses are required" });
+  const transitionValidation = validateApplicationTransitionInput(req.body);
+  if (transitionValidation.errors.length > 0) {
+    return res.status(400).json({ error: transitionValidation.errors[0] });
   }
+  const from = normalizeStatus(transitionValidation.value.from);
+  const to = normalizeStatus(transitionValidation.value.to);
 
   const client = await pool.connect();
   try {

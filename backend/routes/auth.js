@@ -1,23 +1,38 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const rateLimit = require("express-rate-limit");
 const pool = require("../db");
 const { validateRegistration, validatePasswordChange, isValidEmail } = require("../middleware/validate");
 const catchAsync = require("../middleware/catchAsync");
 const logger = require("../middleware/logger");
+const { createMutationLimiter } = require("../middleware/rateLimits");
 
 const router = express.Router();
 
-const authLimiter = rateLimit({
+const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || "connect.sid";
+const registerLimiter = createMutationLimiter({
+    routeName: "auth-register",
     windowMs: 15 * 60 * 1000,
     max: 20,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: "Too many attempts, please try again later" },
+    testMax: 20,
+    message: "Too many registration attempts, please try again later",
+});
+const loginLimiter = createMutationLimiter({
+    routeName: "auth-login",
+    windowMs: 15 * 60 * 1000,
+    max: 40,
+    testMax: 40,
+    message: "Too many login attempts, please try again later",
+});
+const resetLimiter = createMutationLimiter({
+    routeName: "auth-reset",
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    testMax: 10,
+    message: "Too many password reset attempts, please try again later",
 });
 
 // /api/auth/register POST method
-router.post("/register", authLimiter, catchAsync(async (req, res) => {
+router.post("/register", registerLimiter, catchAsync(async (req, res) => {
     const { first_name, last_name, email, password, role } = req.body;
 
     if (!first_name || !last_name || !email || !password) {
@@ -87,7 +102,7 @@ router.post("/register", authLimiter, catchAsync(async (req, res) => {
 }));
 
 // /api/auth/login POST method
-router.post("/login", authLimiter, catchAsync(async (req, res) => {
+router.post("/login", loginLimiter, catchAsync(async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -142,15 +157,14 @@ router.get("/me", (req, res) => {
 
 // /api/auth/logout POST method
 router.post("/logout", (req, res) => {
-    const cookieName = req.session.cookie.name || "connect.sid";
     req.session.destroy(() => {
-        res.clearCookie(cookieName);
+        res.clearCookie(SESSION_COOKIE_NAME);
         res.json({ message: "Logged out" });
     });
 });
 
 // /api/auth/reset-password POST method
-router.post("/reset-password", authLimiter, catchAsync(async (req, res) => {
+router.post("/reset-password", resetLimiter, catchAsync(async (req, res) => {
     const { email, current_password, new_password } = req.body;
 
     if (!email || !current_password || !new_password) {
@@ -185,9 +199,8 @@ router.post("/reset-password", authLimiter, catchAsync(async (req, res) => {
 
     logger.info({ userId: users[0].id }, "Password updated");
 
-    const cookieName = req.session.cookie.name || "connect.sid";
     req.session.destroy(() => {
-        res.clearCookie(cookieName);
+        res.clearCookie(SESSION_COOKIE_NAME);
         res.json({ message: "Password updated successfully" });
     });
 }));

@@ -1,4 +1,5 @@
 const { Client } = require("pg");
+const pool = require("../db");
 
 const TEST_DB = "studenthub_test";
 const PREPARED = process.env.TEST_DB_ALREADY_PREPARED === "true";
@@ -11,6 +12,8 @@ const ROOT_CONFIG = {
 };
 
 module.exports = async function globalTeardown() {
+  await pool.end().catch(() => {});
+
   if (PREPARED) {
     return;
   }

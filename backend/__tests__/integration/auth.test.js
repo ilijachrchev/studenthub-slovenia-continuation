@@ -9,7 +9,6 @@ afterAll(async () => {
     'UPDATE "user" SET password_hash = $1 WHERE email = $2',
     [restoredHash, "organizer@studenthub.test"]
   );
-  await pool.end();
 });
 
 describe("POST /api/auth/register", () => {

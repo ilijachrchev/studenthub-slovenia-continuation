@@ -197,6 +197,91 @@ describe("Migration lifecycle", () => {
         status: "not-a-status",
       })
     ).rejects.toThrow();
+
+    await expect(
+      knex("application_history").insert({
+        application_id: 9100,
+        action: "invalid_action",
+        from_status: "pending",
+        to_status: "pending",
+        actor_user_id: 9100,
+      })
+    ).rejects.toThrow();
+
+    await expect(
+      knex("application_history").insert({
+        application_id: 9100,
+        action: "status_transition",
+        from_status: "pending",
+        to_status: "not-a-status",
+        actor_user_id: 9100,
+      })
+    ).rejects.toThrow();
+  });
+
+  test("database enforces uniqueness and delete restrictions on opportunity applications", async () => {
+    await knex("user").insert({
+      id: 9101,
+      first_name: "Applicant",
+      last_name: "Tester",
+      email: "applicant-tester@example.com",
+      password_hash: "hash",
+      role: "student",
+    }).onConflict("id").ignore();
+
+    await knex("user").insert({
+      id: 9102,
+      first_name: "Actor",
+      last_name: "Tester",
+      email: "actor-tester@example.com",
+      password_hash: "hash",
+      role: "organizer",
+    }).onConflict("id").ignore();
+
+    await knex("organization").insert({
+      id: 9101,
+      name: "Integrity Org",
+      contact_email: "integrity-org@example.com",
+      status: "approved",
+    }).onConflict("id").ignore();
+
+    await knex("opportunity").insert({
+      id: 9101,
+      organization_id: 9101,
+      title: "Integrity Opportunity",
+      description: "Used to validate unique application and actor delete behavior",
+      location: "Koper",
+      deadline: "2026-10-22 10:00:00",
+      status: "draft",
+    }).onConflict("id").ignore();
+
+    await knex("application").insert({
+      id: 9101,
+      opportunity_id: 9101,
+      applicant_user_id: 9101,
+      status: "pending",
+    }).onConflict("id").ignore();
+
+    await knex("application_history").insert({
+      id: 9103,
+      application_id: 9101,
+      action: "status_transition",
+      from_status: "pending",
+      to_status: "under_review",
+      actor_user_id: 9102,
+    }).onConflict("id").ignore();
+
+    await expect(
+      knex("application").insert({
+        opportunity_id: 9101,
+        applicant_user_id: 9101,
+        status: "pending",
+      })
+    ).rejects.toThrow();
+
+    await expect(
+      knex("user").where({ id: 9102 }).delete()
+    ).rejects.toThrow();
   });
 
   test("updated_at is refreshed by the database trigger", async () => {
@@ -361,6 +446,35 @@ describe("Migration lifecycle", () => {
     expect(Number((await knex("opportunity").where({ id: 9002 }).count({ count: "*" }))[0].count)).toBe(0);
     expect(Number((await knex("application").where({ id: 9002 }).count({ count: "*" }))[0].count)).toBe(0);
     expect(Number((await knex("application_history").where({ id: 9002 }).count({ count: "*" }))[0].count)).toBe(0);
+  });
+
+  test("notification rows cascade when the recipient user is deleted", async () => {
+    await knex("user").insert({
+      id: 9104,
+      first_name: "Notify",
+      last_name: "Tester",
+      email: "notify-tester@example.com",
+      password_hash: "hash",
+      role: "student",
+    }).onConflict("id").ignore();
+
+    await knex("notification_preferences").insert({
+      user_id: 9104,
+      preferences: knex.raw("?::jsonb", [JSON.stringify({ "application.received": false })]),
+    }).onConflict("user_id").ignore();
+
+    await knex("notification").insert({
+      id: 9104,
+      recipient_user_id: 9104,
+      type: "application.received",
+      payload: knex.raw("?::jsonb", [JSON.stringify({ test: true })]),
+      is_read: false,
+    }).onConflict("id").ignore();
+
+    await knex("user").where({ id: 9104 }).delete();
+
+    expect(Number((await knex("notification_preferences").where({ user_id: 9104 }).count({ count: "*" }))[0].count)).toBe(0);
+    expect(Number((await knex("notification").where({ id: 9104 }).count({ count: "*" }))[0].count)).toBe(0);
   });
 
   test("migrations run down successfully", async () => {

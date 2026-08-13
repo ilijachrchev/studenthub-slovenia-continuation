@@ -46,6 +46,9 @@ const REQUIRED_TABLES = [
   "notification",
   "opportunity_tag",
   "opportunity_bookmark",
+  "opportunity_report",
+  "opportunity_event",
+  "moderation_audit_log",
 ];
 
 describe("Migration lifecycle", () => {
@@ -113,6 +116,15 @@ describe("Migration lifecycle", () => {
     }
   });
 
+  test("moderation, analytics and bookmark tables exist after migration", async () => {
+    const { rows } = await knex.raw(
+      "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+    );
+    const tableNames = rows.map((r) => r.tablename);
+    for (const table of ["opportunity_bookmark", "opportunity_report", "opportunity_event", "moderation_audit_log"]) {
+      expect(tableNames).toContain(table);
+    }
+  });
   test("opportunity has an updated_at column after migration", async () => {
     const { rows } = await knex.raw(
       `SELECT column_name FROM information_schema.columns

@@ -2,9 +2,10 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Bell, LogoutKopce } from "../reusable/Icons";
 import { useEffect, useRef, useState } from "react";
+import { apiRequest } from "../../lib/api";
 
 function Topbar() {
-    const { user, loading, refreshUser } = useAuth();
+    const { user, loading, logout } = useAuth();
     const navigate = useNavigate();
     const [term, setTerm] = useState("");
     const [unreadCount, setUnreadCount] = useState(0);
@@ -44,15 +45,7 @@ function Topbar() {
     };
 
     const handleLogout = async () => {
-        try {
-            await fetch("/api/auth/logout", {
-                method: "POST",
-                credentials: "include",
-            });
-        } catch {
-            // Ignore logout failures and continue clearing local auth state.
-        }
-        await refreshUser();
+        await logout();
         navigate("/login");
     };
 
@@ -66,12 +59,8 @@ function Topbar() {
 
         const loadUnreadCount = async () => {
             try {
-                const response = await fetch("/api/notifications?unread=1", {
-                    credentials: "include",
-                });
-                const data = await response.json().catch(() => ({}));
-
-                if (!alive || !response.ok) return;
+                const data = await apiRequest("/api/notifications?unread=1");
+                if (!alive) return;
 
                 if (typeof data.unreadCount === "number") {
                     setUnreadCount(data.unreadCount);

@@ -2,11 +2,11 @@ const express = require("express");
 const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
 const logger = require("../middleware/logger");
-const { requireRole } = require("../middleware/auth");
+const { requireAdminRecord } = require("../middleware/auth");
 
 const router = express.Router();
 
-const requireAdmin = requireRole("admin");
+const requireAdmin = requireAdminRecord;
 
 // /api/admin/events/pending GET method
 router.get("/events/pending", requireAdmin, catchAsync(async (req, res) => {
@@ -47,16 +47,7 @@ router.post("/events/:id/reject", requireAdmin, catchAsync(async (req, res) => {
         return res.status(400).json({ error: "Rejection reason is required" });
     }
 
-    const { rows: admins } = await pool.query(
-        "SELECT id FROM admin WHERE user_id = $1",
-        [req.session.user.id]
-    );
-
-    if (admins.length === 0) {
-        return res.status(403).json({ error: "Admin record not found for this account" });
-    }
-
-    const adminId = admins[0].id;
+    const adminId = req.admin.id;
     const client = await pool.connect();
     try {
         await client.query("BEGIN");

@@ -11,13 +11,13 @@
 ## 📋 Status board (read this first)
 
 **Program:** StudentHub Slovenia production evolution · Base branch `dev` @ `fdf81aa`
-**Current wave:** Wave 1 (Foundation) · **Last updated:** _(agent fills)_
+**Current wave:** Wave 1 (Foundation) · **Last updated:** 2026-08-13 (Integration & Cleanup Pass)
 
 | Agent | Branch | Current WP | Status | Next task | Blocked by |
 |------|--------|-----------|--------|-----------|-----------|
 | 1 Integration Reviewer | — | — | ⬜ idle | review DB merge | Agent 3 |
 | 2 Security Reviewer | — | — | ⬜ idle | review DB merge | Agent 3 |
-| 3 DB & Integrity | `feature/ai-db-integrity` | WP-DB-01 | ⬜ | WP-DB-01 | — |
+| 3 DB & Integrity | `feature/ai-db-integrity` | WP-DB-02 | ✅ code / 🟨 unverified (no PG) | WP-DB-03 | Docker/PG |
 | 4 Opportunity Lifecycle | `feature/ai-opportunity-lifecycle` | WP-OPP-05 | ⬜ | WP-OPP-05 | DB-01 |
 | 5 Backend Hardening | `feature/ai-backend-hardening` | WP-SEC-01 | ⬜ | WP-SEC-01 | — |
 | 6 Discovery Intel | `feature/ai-discovery-intel` | WP-REC-01 | ⬜ | WP-REC-01 | DB-02 |
@@ -31,7 +31,10 @@
 - _(Agents post here, e.g. "Agent 4 → Agent 5: please mount `opportunities` router at `/api/opportunities`")_
 
 ### Open blockers / risks discovered
-- _(logged as found)_
+- **[2026-08-12] Local DB unavailable:** Docker Desktop cannot start on this host, so Postgres
+  (:5433) is unreachable. DB-backed test suites (`npm test`) cannot run locally; all DB work is
+  validated by CI for now. Static checks (`node --check`, module shape) are run locally as a
+  first gate. To unblock local verification: start Docker Desktop, then `docker compose up -d db-pg`.
 
 ---
 
@@ -124,13 +127,98 @@ Queue: `WP-PROD-01` → `WP-PROD-03` → `WP-PROD-02` → `WP-PROD-04`
 > ```
 
 ### Agent 1 — Integration & Architecture Reviewer
-_(no entries yet)_
+
+### [2026-08-13] Integration & Cleanup Pass — repository-wide
+- Status: 🔁 (cleanup complete; branches classified; **no merges performed**)
+- Scope: took the multi-agent state (18 worktrees), committed all uncommitted work into small
+  reviewable commits, classified every branch, and fixed the concrete in-scope defects. Did **not**
+  merge, rebase, force-push, or delete anything.
+
+**Environment:** Docker Desktop **cannot start** on this host ("Docker Desktop is unable to start");
+Postgres :5433 is unreachable (ECONNREFUSED). All DB-backed suites (jest migration/integration,
+`db:migrate/seed/verify`) are **BLOCKED** and were **not** run. Static `node --check` was run on every
+committed backend file; frontend `lint`/`build`/`test` (vitest) **were** run and are real results.
+
+**Uncommitted work committed (worktree → commits):**
+- `feature/ai-db-integrity` (WP-DB-02): `c8bfb48` migration, `d6b4e61` test.
+- `feat/app-state-machine-history` (grand-bear): `d88ec7a` `1ade755` `1622010` `3d5f597`.
+- `feature/agent-2-opportunities` (rainy-rabbit): `962274e` `ce6d93b` `a3926c9` `8b9560c` `be23303`.
+- `feature/recommendations-analytics-moderation` (harsh-cow): `ffc180c` `a6e05c6` `054621c` `341ab2f`.
+- `agent-7-moderation-admin` (skinny-stingray): `feafbfa` `8dd5bb0` `9261778` `33f7919` `07ff55e` `52aac35`.
+- `wave-1-agent-5-backend-sec` (massive-swan): `4408f2d` `a5d152c` `3864ce0` `55777eb` `041799b`.
+- `feature/opp-hub-discovery-ui` (innocent-warthog): `ce86b6f` `e979f64` `9b97eff` + restored empty
+  `Notifications.jsx` (build-blocker) from HEAD.
+- `wave-1/frontend-arch-routing` (money-mule): `1d0f6a1` `307dc51` `08c4cf4` `da5d741` `83b70a5` `34c7344`.
+- `wave-1/testing-ci-cd` (wicked-catfish): `3b3b8eb` `0dbb52f` `24bf28a` `11956c3` `e15a47f`
+  (+ gitignored `frontend/coverage/` build output).
+- `review/studenthub-slovenia-engineering` (helpful-snake): `1560d2a` `11e0185`.
+
+**Fixed:** empty `Notifications.jsx` → restored (opp-hub build now green); `frontend/coverage/`
+(195 build-output files) excluded via `.gitignore` instead of being committed.
+
+**Verified (ran):** opp-hub-discovery-ui — lint ✓, build ✓, vitest 11/11 ✓. testing-ci-cd —
+vitest 22/22 ✓. frontend-arch-routing — build ✓, vitest 15/15 ✓, **lint ✗ (21 no-unused-vars/no-undef)**.
+
+**Blocked (could NOT run — no Postgres):** all backend jest suites on every branch; every migration;
+`db:verify`; all `*.test.js` integration suites committed this pass. These are IMPLEMENTED, not VERIFIED.
+
+**Top architectural conflicts needing a decision (see report):**
+1. **Schema ownership is fragmented.** Five branches ship a `20260715000004_*` migration
+   (lifecycle-expand, moderation-audit, session-store, analytics-events) plus `20260812*` variants —
+   they collide and must be consolidated into the DB branch.
+2. **Three competing analytics tables:** DB `opportunity_event` (canonical) vs harsh-cow
+   `analytics_events`→**event.id (legacy)** vs agent-6 `opportunity_analytics_event`.
+3. **Duplicate opportunity-lifecycle backends:** canonical `implement-opp-lifecycle-backend` vs
+   `feature/agent-2-opportunities`.
+4. **Duplicate moderation:** skinny-stingray (opportunity.id, better) vs harsh-cow (event.id).
+5. **Overlapping frontend branches:** opp-hub-discovery-ui vs frontend-arch-routing modify the same pages.
+6. **Sessions:** `wave-1-prod-observability` still uses MemoryStore; the proper pg session store lives
+   uncommitted-then-committed in `wave-1-agent-5-backend-sec` (do not build a parallel one).
+7. **Organizer analytics `views=0`** in `implement-opp-lifecycle-backend` is a real cross-branch
+   dependency on DB `opportunity_event`; documented, not fabricated.
 
 ### Agent 2 — Security & Quality Reviewer
 _(no entries yet)_
 
 ### Agent 3 — Database & Data Integrity
-_(no entries yet)_
+
+### [2026-08-13] Agent 3 — WP-DB-02 — Moderation/analytics/bookmark tables
+- Status: ✅ code complete; DB-backed tests **BLOCKED** (no local Postgres — Docker Desktop cannot start).
+- What changed: new migration `backend/db/migrations/20260716000002_moderation_analytics_bookmarks.js`
+  creating `opportunity_bookmark`, `opportunity_report`, `opportunity_event` (all FKs target
+  `opportunity.id`/`user.id`; reuses `set_updated_at()` from 20260716000001). Extended
+  `migration.test.js` to assert those three tables exist.
+- Commits: `c8bfb48 feat(db): add moderation, analytics and bookmark tables (WP-DB-02)`;
+  `d6b4e61 test(db): assert moderation/analytics/bookmark tables exist`.
+- Tests executed: `node --check` (pass). `npm test` NOT run — no Postgres.
+- Note: this is the **canonical** analytics/report/bookmark schema. Other branches created competing
+  tables (`analytics_events`→event.id, `opportunity_analytics_event`) and duplicate
+  `opportunity_report`/`opportunity_bookmark` under colliding `20260715000004_*` timestamps — those
+  must be reconciled onto this schema, not merged alongside it.
+
+### [2026-08-12] Agent 3 — WP-DB-01 — Opportunity schema completion
+- Status: ✅ (code complete; DB-backed tests pending CI — see caveat)
+- What changed: new migration `backend/db/migrations/20260716000001_opportunity_integrity.js`
+  (adds `opportunity.updated_at`; `set_updated_at()` trigger on `opportunity` + `application`;
+  explicit `ON DELETE CASCADE` on `opportunity.organization_id`, `application.opportunity_id`,
+  `application.applicant_user_id`; composite `idx_opportunity_status_deadline`). Extended
+  `backend/__tests__/migration.test.js` with 3 assertions (updated_at column, trigger overrides
+  stale write, cascade delete).
+- Commits: `26eb567 feat(db): add opportunity integrity migration`;
+  `89bb54b test(db): verify opportunity updated_at trigger and cascade delete`.
+- Tests executed: `node --check` on both files (pass); module-shape check (up/down are functions).
+  **Could NOT run `npm test` locally** — Docker Desktop fails to start, so no Postgres on :5433.
+- Test results: static checks pass. DB integration deferred to CI (GitHub Actions provisions PG 16
+  and runs `db:migrate` + jest).
+- Known failures: none observed statically. Trigger requires PostgreSQL >= 14 (`CREATE OR REPLACE
+  TRIGGER`); project targets PG 16 — OK.
+- Decisions: chose CASCADE (not RESTRICT) down the ownership chain, matching the existing
+  `application_history -> application` CASCADE. Trigger override test is deterministic (writes a
+  year-2000 timestamp and asserts it was overwritten) to avoid clock-based flakiness.
+- Discovered risks: **Local verification is blocked — Docker Desktop unavailable on this host.** All
+  DB-backed WPs must be validated in CI until a local Postgres is available. Added to blockers below.
+- Remaining work in this WP: confirm green in CI once branch is pushed.
+- Recommended next task: WP-DB-02 (moderation/analytics/bookmark tables).
 
 ### Agent 4 — Opportunity Lifecycle Backend
 _(no entries yet)_

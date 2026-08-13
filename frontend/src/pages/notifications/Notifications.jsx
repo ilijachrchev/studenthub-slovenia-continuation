@@ -5,7 +5,6 @@ import {
   toArray,
   unwrapMessage,
 } from "../../components/opportunities/opportunitiesUtils";
-import ApplicationStatusBadge from "../../components/opportunities/ApplicationStatusBadge";
 import "./../opportunities/css/opportunities.css";
 
 const DEFAULT_PREFERENCES = {
@@ -85,6 +84,11 @@ function Notifications() {
   }, []);
 
   const unreadCount = notifications.filter((notification) => notification.unread).length;
+
+  const formatTypeLabel = (value) => String(value || "")
+    .replace(/\./g, " ")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 
   const markRead = async (notification) => {
     setNotifications((current) =>
@@ -221,7 +225,9 @@ function Notifications() {
 
               <div className="opp-notification-meta">
                 {notification.createdAt && <span>{formatDateTime(notification.createdAt)}</span>}
-                <ApplicationStatusBadge status={notification.type} />
+                <span className="status-badge status-pending">
+                  {formatTypeLabel(notification.type)}
+                </span>
               </div>
 
               {notification.unread && (

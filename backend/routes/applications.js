@@ -3,7 +3,12 @@ const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { assertTransition, normalizeStatus } = require("../lib/opportunity/statusMachine");
-const { emit } = require("../lib/opportunity/notifications");
+const {
+  emitApplicationReceived,
+  emitApplicationStatusChanged,
+  getOpportunityOwner,
+  getOpportunityForApplicant,
+} = require("../lib/opportunity/lifecycle");
 
 const router = express.Router();
 
@@ -14,38 +19,6 @@ function toIso(value) {
 function parseId(value) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-async function getOpportunityOwner(client, opportunityId) {
-  const { rows } = await client.query(
-    `SELECT op.user_id
-     FROM opportunity o
-     JOIN organization org ON org.id = o.organization_id
-     JOIN organizer_profile op ON op.organization_id = org.id AND op.role_in_org = 'owner'
-     WHERE o.id = $1
-     ORDER BY op.user_id ASC
-     LIMIT 1`,
-    [opportunityId]
-  );
-
-  return rows[0] ? rows[0].user_id : null;
-}
-
-async function getOpportunityForApplicant(client, opportunityId, userId) {
-  const { rows } = await client.query(
-    `SELECT o.id, o.title, o.description, o.location, o.status, o.deadline,
-            org.id AS organization_id, org.name AS organization_name
-     FROM opportunity o
-     JOIN organization org ON org.id = o.organization_id
-     WHERE o.id = $1 AND o.status = 'published' AND o.deadline > NOW()`,
-    [opportunityId]
-  );
-
-  if (rows.length === 0) {
-    return null;
-  }
-
-  return rows[0];
 }
 
 router.post("/:id/apply", requireAuth, requireRole("student"), catchAsync(async (req, res) => {
@@ -83,12 +56,13 @@ router.post("/:id/apply", requireAuth, requireRole("student"), catchAsync(async 
 
     const ownerUserId = await getOpportunityOwner(client, opportunityId);
     if (ownerUserId) {
-      await emit(ownerUserId, "application.received", {
+      await emitApplicationReceived(client, {
+        ownerUserId,
         applicationId: application.id,
         opportunityId,
         applicantUserId: req.session.user.id,
         opportunityTitle: opportunity.title,
-      }, client);
+      });
     }
 
     await client.query("COMMIT");
@@ -272,14 +246,15 @@ router.post("/:id/transition", requireAuth, catchAsync(async (req, res) => {
 
     const recipientUserId = role === "student" ? ownerUserId : application.applicant_user_id;
     if (recipientUserId) {
-      await emit(recipientUserId, "application.status_changed", {
+      await emitApplicationStatusChanged(client, {
+        recipientUserId,
         applicationId,
         opportunityId: application.opportunity_id,
         fromStatus: from,
         toStatus: to,
         actorUserId: req.session.user.id,
         actorRole: role,
-      }, client);
+      });
     }
 
     await client.query("COMMIT");

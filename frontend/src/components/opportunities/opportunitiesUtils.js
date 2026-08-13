@@ -151,6 +151,19 @@ export function normaliseOpportunity(opportunity = {}) {
 }
 
 export function normaliseOpportunityList(source) {
+  if (source && typeof source === "object" && !Array.isArray(source)) {
+    const hasCollection =
+      source.opportunities != null ||
+      source.items != null ||
+      source.data != null ||
+      source.results != null ||
+      source.rows != null;
+
+    if (!hasCollection && (source.error || source.message)) {
+      return [];
+    }
+  }
+
   const items =
     source?.opportunities ??
     source?.items ??
@@ -237,6 +250,70 @@ export function dispatchAnalytics(eventName, payload = {}) {
   }
 
   window.dispatchEvent(new CustomEvent("analytics:event", { detail }));
+
+  const allowedEvents = new Set([
+    "opportunity_view",
+    "opportunity_saved",
+    "opportunity_unsaved",
+    "opportunity_applied",
+    "opportunity_report_clicked",
+  ]);
+
+  if (!allowedEvents.has(eventName)) {
+    return;
+  }
+
+  if (!window.__oppAnalyticsQueue) {
+    window.__oppAnalyticsQueue = [];
+  }
+
+  window.__oppAnalyticsQueue.push(detail);
+
+  if (!window.__oppAnalyticsFlushTimer) {
+    const flush = async () => {
+      const events = window.__oppAnalyticsQueue || [];
+      if (events.length === 0) return;
+      window.__oppAnalyticsQueue = [];
+
+      const payloadBody = JSON.stringify({ events });
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon("/api/analytics/events", new Blob([payloadBody], { type: "application/json" }));
+        return;
+      }
+
+      try {
+        await fetch("/api/analytics/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: payloadBody,
+          keepalive: true,
+        });
+      } catch {
+        // Ignore analytics transport failures.
+      }
+    };
+
+    window.__oppAnalyticsFlushTimer = window.setTimeout(async () => {
+      window.__oppAnalyticsFlushTimer = null;
+      await flush();
+    }, 1000);
+
+    const flushOnHide = () => {
+      if (window.__oppAnalyticsFlushTimer) {
+        clearTimeout(window.__oppAnalyticsFlushTimer);
+        window.__oppAnalyticsFlushTimer = null;
+      }
+      flush();
+    };
+
+    window.addEventListener("pagehide", flushOnHide, { once: true });
+    window.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        flushOnHide();
+      }
+    }, { once: true });
+  }
 }
 
 export function unwrapMessage(data, fallback) {

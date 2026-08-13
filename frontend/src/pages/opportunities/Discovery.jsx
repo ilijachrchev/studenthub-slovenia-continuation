@@ -85,8 +85,9 @@ function Discovery() {
             : savedData.ids || savedData.savedIds || []
         );
 
-        const recItems = normaliseOpportunityList(recommendationsData);
-        setRecommendations(recItems);
+        setRecommendations(
+          recommendationsRes.ok ? normaliseOpportunityList(recommendationsData) : []
+        );
       } catch {
         if (alive) setError("Failed to load opportunities");
       } finally {

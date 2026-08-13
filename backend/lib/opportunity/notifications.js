@@ -1,12 +1,29 @@
 const pool = require("../../db");
 
+const TYPE_ALIASES = {
+  "application.received": ["application_updates"],
+  "application.status_changed": ["application_updates"],
+  "opportunity.recommendation": ["recommendation_updates"],
+  "opportunity.deadline_reminder": ["deadline_reminders"],
+};
+
 function isEnabledForType(preferences, type) {
   if (!preferences || typeof preferences !== "object") {
     return true;
   }
 
-  if (Object.prototype.hasOwnProperty.call(preferences, type)) {
-    return preferences[type] !== false;
+  const keys = [type, ...(TYPE_ALIASES[type] || [])];
+
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(preferences, key) && preferences[key] === false) {
+      return false;
+    }
+  }
+
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(preferences, key) && preferences[key] === true) {
+      return true;
+    }
   }
 
   return true;

@@ -67,6 +67,15 @@ export async function requestJson(url, options = {}) {
       body: requestBody,
     });
   } catch (cause) {
+    if (cause?.name === "AbortError") {
+      throw new ApiError({
+        message: "Request cancelled",
+        status: 0,
+        code: "aborted",
+        url,
+        cause,
+      });
+    }
     throw new ApiError({
       message: "Network error",
       status: 0,
@@ -140,4 +149,3 @@ export function getApiFieldErrors(error) {
 
   return payload.errors || payload.fieldErrors || payload.fields || null;
 }
-

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, beforeEach, test, vi } from "vitest";
 import PendingEvents from "../pages/admin/PendingEvents";
@@ -13,11 +13,11 @@ function mockJsonResponse(body, ok = true) {
 
 describe("Admin queues", () => {
   beforeEach(() => {
-    global.fetch = vi.fn();
+    globalThis.fetch = vi.fn();
   });
 
   test("pending events retry after an initial load failure", async () => {
-    global.fetch
+    globalThis.fetch
       .mockResolvedValueOnce(mockJsonResponse({ error: "Queue unavailable" }, false))
       .mockResolvedValueOnce(mockJsonResponse({
         events: [
@@ -46,7 +46,7 @@ describe("Admin queues", () => {
   });
 
   test("pending organizations retry after an initial load failure", async () => {
-    global.fetch
+    globalThis.fetch
       .mockResolvedValueOnce(mockJsonResponse({ error: "Queue unavailable" }, false))
       .mockResolvedValueOnce(mockJsonResponse({
         organizations: [
@@ -75,7 +75,7 @@ describe("Admin queues", () => {
   });
 
   test("reject modal is exposed as a dialog", async () => {
-    global.fetch
+    globalThis.fetch
       .mockResolvedValueOnce(mockJsonResponse({
         events: [
           {

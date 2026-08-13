@@ -39,7 +39,7 @@ function preferencesResponse(preferences = {}) {
 describe("Notifications", () => {
   beforeEach(() => {
     useAuth.mockReturnValue({ user: { id: 1, role: "student" }, loading: false });
-    global.fetch = vi.fn();
+    globalThis.fetch = vi.fn();
   });
 
   test("loads notifications and updates unread state when a notification is marked read", async () => {
@@ -54,7 +54,7 @@ describe("Notifications", () => {
       },
     ];
 
-    global.fetch
+    globalThis.fetch
       .mockResolvedValueOnce(notificationResponse(initialItems))
       .mockResolvedValueOnce(preferencesResponse({
         application_updates: true,
@@ -92,7 +92,7 @@ describe("Notifications", () => {
       },
     ];
 
-    global.fetch
+    globalThis.fetch
       .mockResolvedValueOnce(notificationResponse(initialItems))
       .mockResolvedValueOnce(preferencesResponse())
       .mockResolvedValueOnce({
@@ -133,7 +133,7 @@ describe("Notifications", () => {
       },
     ];
 
-    global.fetch
+    globalThis.fetch
       .mockResolvedValueOnce(notificationResponse(initialItems))
       .mockResolvedValueOnce(preferencesResponse())
       .mockResolvedValueOnce(notificationResponse(refreshedItems))

@@ -1,8 +1,11 @@
 const express = require("express");
 const pool = require("../db");
-const { validateOrganization } = require("../middleware/validate");
 const catchAsync = require("../middleware/catchAsync");
 const { requireAuth, requireRole } = require("../middleware/auth");
+const { organizationLimiter } = require("../middleware/rateLimits");
+const {
+    validateOrganizationInput,
+} = require("../validators/input");
 
 const router = express.Router();
 
@@ -11,23 +14,26 @@ function placeHolders(n) {
 }
 
 // /api/organizations POST method
-router.post("/", requireAuth, requireRole("organizer"), catchAsync(async (req, res) => {
-    const { name, description, logo, website, contact_email, university_id } = req.body;
-
-    if (!name || !contact_email) {
-        return res.status(400).json({ error: "Organization name and contact email are required" });
+router.post("/", requireAuth, requireRole("organizer"), organizationLimiter, catchAsync(async (req, res) => {
+    const validation = validateOrganizationInput(req.body);
+    if (validation.errors.length > 0) {
+        const firstError = validation.errors[0];
+        if (
+            firstError.startsWith("Organization name") ||
+            firstError.startsWith("Contact email")
+        ) {
+            return res.status(400).json({ error: "Organization name and contact email are required" });
+        }
+        return res.status(400).json({ error: firstError });
     }
 
-    const validationErrors = validateOrganization(req.body);
-    if (validationErrors.length > 0) {
-        return res.status(400).json({ error: validationErrors[0] });
-    }
+    const { name, description, logo, website, contact_email, university_id } = validation.value;
 
     // create org with status = PENDING
     const { rows: [org] } = await pool.query(
         `INSERT INTO organization (name, description, logo, website, contact_email, university_id, status)
          VALUES ($1, $2, $3, $4, $5, $6, 'pending') RETURNING id`,
-        [name, description || null, logo || null, website || null, contact_email, university_id || null]
+        [name, description, logo, website, contact_email, university_id]
     );
 
     await pool.query(
@@ -47,7 +53,8 @@ router.get("/my-application", requireAuth, catchAsync(async (req, res) => {
     const { rows } = await pool.query(
         `SELECT o.* FROM organization o
         JOIN organizer_profile op ON op.organization_id = o.id
-        WHERE op.user_id = $1`,
+        WHERE op.user_id = $1
+        AND op.role_in_org = 'owner'`,
         [req.session.user.id]
     );
 

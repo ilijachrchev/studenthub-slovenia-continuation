@@ -2,6 +2,11 @@ const express = require("express");
 const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
 const { requireAuth } = require("../middleware/auth");
+const { notificationLimiter } = require("../middleware/rateLimits");
+const {
+  parsePositiveInteger,
+  validateNotificationPreferencesInput,
+} = require("../validators/input");
 
 const router = express.Router();
 
@@ -73,14 +78,19 @@ router.get("/", requireAuth, catchAsync(async (req, res) => {
   });
 }));
 
-router.post("/:id/read", requireAuth, catchAsync(async (req, res) => {
+router.post("/:id/read", requireAuth, notificationLimiter, catchAsync(async (req, res) => {
+  const notificationId = parsePositiveInteger(req.params.id);
+  if (!notificationId) {
+    return res.status(404).json({ error: "Notification not found" });
+  }
+
   const { rowCount, rows } = await pool.query(
     `UPDATE notification
      SET is_read = true,
          read_at = COALESCE(read_at, NOW())
      WHERE id = $1 AND recipient_user_id = $2
      RETURNING id, recipient_user_id, type, payload, is_read, created_at, read_at`,
-    [req.params.id, req.session.user.id]
+    [notificationId, req.session.user.id]
   );
 
   if (rowCount === 0) {
@@ -90,7 +100,7 @@ router.post("/:id/read", requireAuth, catchAsync(async (req, res) => {
   res.json({ notification: rows[0] });
 }));
 
-router.post("/read-all", requireAuth, catchAsync(async (req, res) => {
+router.post("/read-all", requireAuth, notificationLimiter, catchAsync(async (req, res) => {
   const { rowCount } = await pool.query(
     `UPDATE notification
      SET is_read = true,
@@ -113,13 +123,10 @@ router.get("/preferences", requireAuth, catchAsync(async (req, res) => {
   });
 }));
 
-router.put("/preferences", requireAuth, catchAsync(async (req, res) => {
-  const preferences = req.body && typeof req.body.preferences === "object"
-    ? req.body.preferences
-    : req.body;
-
-  if (!preferences || typeof preferences !== "object" || Array.isArray(preferences)) {
-    return res.status(400).json({ error: "Preferences must be an object" });
+router.put("/preferences", requireAuth, notificationLimiter, catchAsync(async (req, res) => {
+  const validation = validateNotificationPreferencesInput(req.body);
+  if (validation.errors.length > 0) {
+    return res.status(400).json({ error: validation.errors[0] });
   }
 
   const { rows } = await pool.query(
@@ -128,7 +135,7 @@ router.put("/preferences", requireAuth, catchAsync(async (req, res) => {
      ON CONFLICT (user_id)
      DO UPDATE SET preferences = EXCLUDED.preferences, updated_at = NOW()
      RETURNING preferences`,
-    [req.session.user.id, JSON.stringify(preferences)]
+    [req.session.user.id, JSON.stringify(validation.value)]
   );
 
   res.json({ preferences: rows[0].preferences });

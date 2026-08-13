@@ -12,18 +12,21 @@ function ApplicationStatus() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const controller = new AbortController();
     async function load() {
       try {
-        const data = await requestJson("/api/organizations/my-application");
+        const data = await requestJson("/api/organizations/my-application", { signal: controller.signal });
         setHasApplication(data.hasApplication);
         setOrganization(data.organization || null);
       } catch (error) {
+        if (controller.signal.aborted || error?.code === "aborted") return;
         setError(getApiErrorMessage(error, "Something went wrong. Please try again"));
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
     load();
+    return () => controller.abort();
   }, []);
 
   if (loading) {

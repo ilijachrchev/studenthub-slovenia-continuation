@@ -16,21 +16,27 @@ function SearchResults() {
         return;
     }
 
+    const controller = new AbortController();
+
     async function search() {
         setLoading(true);
         setError("");
 
         try {
-            const data = await requestJson(`/api/search?q=${encodeURIComponent(query)}`);
+            const data = await requestJson(`/api/search?q=${encodeURIComponent(query)}`, {
+                signal: controller.signal,
+            });
             setEvents(data.events || []);
         } catch (error) {
+            if (controller.signal.aborted || error?.code === "aborted") return;
             setError(getApiErrorMessage(error, "Search failed"));
         } finally {
-            setLoading(false);
+            if (!controller.signal.aborted) setLoading(false);
         }
     }
 
     search();
+    return () => controller.abort();
   }, [query]);
 
 

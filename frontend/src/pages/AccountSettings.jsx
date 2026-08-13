@@ -18,12 +18,13 @@ function AccountSettings() {
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
+    const controller = new AbortController();
     async function loadData() {
         try {
             const [facultiesData, tagData, profile] = await Promise.all([
-                requestJson("/api/faculties"),
-                requestJson("/api/tags"),
-                requestJson("/api/student/profile"),
+                requestJson("/api/faculties", { signal: controller.signal }),
+                requestJson("/api/tags", { signal: controller.signal }),
+                requestJson("/api/student/profile", { signal: controller.signal }),
             ]);
 
             setFaculties(facultiesData);
@@ -35,12 +36,14 @@ function AccountSettings() {
                 setSelectedTags(profile.tag_ids || []);
             }
         } catch (error) {
+            if (controller.signal.aborted || error?.code === "aborted") return;
             setLoadError(getApiErrorMessage(error, "Failed to load your settings"));
         } finally {
-            setLoading(false);
+            if (!controller.signal.aborted) setLoading(false);
         }
     }
     loadData();
+    return () => controller.abort();
   }, []);
 
   const toggleTag = (tagId) => {

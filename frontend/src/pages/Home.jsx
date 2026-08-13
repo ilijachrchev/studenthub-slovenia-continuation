@@ -21,13 +21,14 @@ function Home() {
   const [savedIds, setSavedIds] = useState([]);
 
   useEffect(() => {
+    const controller = new AbortController();
     let alive = true;
     async function loadEvents() {
       try {
         const [eventsData, tagsData, savedData] = await Promise.all([
-          requestJson("/api/events?page=1&limit=20"),
-          requestJson("/api/tags"),
-          requestJson("/api/bookmarks/ids"),
+          requestJson("/api/events?page=1&limit=20", { signal: controller.signal }),
+          requestJson("/api/tags", { signal: controller.signal }),
+          requestJson("/api/bookmarks/ids", { signal: controller.signal }),
         ]);
 
         if (!alive) return;
@@ -40,6 +41,7 @@ function Home() {
         setSavedIds(savedData.ids || []);
       }
       catch (err) {
+        if (controller.signal.aborted || err?.code === "aborted") return;
         if (!alive) return;
         setError(getApiErrorMessage(err, "Failed to load events"));
       }
@@ -52,6 +54,7 @@ function Home() {
 
     return () => {
       alive = false;
+      controller.abort();
     };
   }, []);
 
@@ -64,6 +67,7 @@ function Home() {
       setPage(nextPage);
       setHasMore((data.events || []).length > 0 && (nextPage * 20) < (data.total || 0));
     } catch (err) {
+      if (err?.code === "aborted") return;
       setError(getApiErrorMessage(err, "Failed to load more events"));
     } finally {
       setLoadingMore(false);

@@ -6,13 +6,22 @@ import SetupFeed from "./pages/SetupFeed";
 import ApplicationStatus from "./pages/ApplicationStatus";
 import Home from "./pages/Home";
 import EventDetail from "./pages/EventDetail";
+import Discovery from "./pages/opportunities/Discovery";
+import OpportunityDetail from "./pages/opportunities/OpportunityDetail";
+import MyApplications from "./pages/opportunities/MyApplications";
+import SavedOpportunities from "./pages/opportunities/SavedOpportunities";
+import Notifications from "./pages/notifications/Notifications";
 import StudentLayout from "./components/layout/StudentLayout";
 import OrganizerLayout from "./components/layout/OrganizerLayout";
 import OrganizerDashboard from "./pages/organizer/OrganizerDashboard";
 import CreateEvent from "./pages/organizer/CreateEvent";
+import ManageOpportunities from "./pages/organizer/opps/ManageOpportunities";
+import OpportunityApplicants from "./pages/organizer/opps/OpportunityApplicants";
+import OpportunityAnalytics from "./pages/organizer/analytics/OpportunityAnalytics";
 import AdminLayout from "./components/layout/AdminLayout";
 import PendingEvents from "./pages/admin/PendingEvents";
 import PendingOrganizations from "./pages/admin/PendingOrganizations";
+import ModerationQueue from "./pages/admin/moderation/ModerationQueue";
 import AccountSettings from "./pages/AccountSettings";
 import Saved from "./pages/Saved";
 import Feedback from "./pages/Feedback";
@@ -34,6 +43,37 @@ export default function App() {
             <StudentLayout>
               <Home />
             </StudentLayout>
+          } />
+          <Route path="/opportunities" element={
+            <StudentLayout>
+              <Discovery />
+            </StudentLayout>
+          } />
+          <Route path="/opportunities/:id" element={
+            <StudentLayout>
+              <OpportunityDetail />
+            </StudentLayout>
+          } />
+          <Route path="/opportunities/applications" element={
+            <ProtectedRoute>
+              <StudentLayout>
+                <MyApplications />
+              </StudentLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/saved-opportunities" element={
+            <ProtectedRoute>
+              <StudentLayout>
+                <SavedOpportunities />
+              </StudentLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/notifications" element={
+            <ProtectedRoute>
+              <StudentLayout>
+                <Notifications />
+              </StudentLayout>
+            </ProtectedRoute>
           } />
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<ResetPassword />} />
@@ -98,6 +138,11 @@ export default function App() {
               </AdminLayout>
             </RoleRoute>
           } />
+          <Route path="/admin/moderation" element={
+            <RoleRoute allowedRoles={["admin"]}>
+              <ModerationQueue />
+            </RoleRoute>
+          } />
           <Route path="/settings" element={
             <ProtectedRoute>
               <StudentLayout>
@@ -118,6 +163,41 @@ export default function App() {
                 <Feedback />
               </StudentLayout>
             </ProtectedRoute>
+          } />
+          <Route path="/organizer/opportunities" element={
+            <RoleRoute allowedRoles={["organizer"]}>
+              <OrganizerLayout>
+                <ManageOpportunities />
+              </OrganizerLayout>
+            </RoleRoute>
+          } />
+          <Route path="/organizer/opportunities/applicants" element={
+            <RoleRoute allowedRoles={["organizer"]}>
+              <OrganizerLayout>
+                <OpportunityApplicants />
+              </OrganizerLayout>
+            </RoleRoute>
+          } />
+          <Route path="/organizer/opportunities/:id/applicants" element={
+            <RoleRoute allowedRoles={["organizer"]}>
+              <OrganizerLayout>
+                <OpportunityApplicants />
+              </OrganizerLayout>
+            </RoleRoute>
+          } />
+          <Route path="/organizer/opportunities/analytics" element={
+            <RoleRoute allowedRoles={["organizer"]}>
+              <OrganizerLayout>
+                <OpportunityAnalytics />
+              </OrganizerLayout>
+            </RoleRoute>
+          } />
+          <Route path="/organizer/opportunities/:id/analytics" element={
+            <RoleRoute allowedRoles={["organizer"]}>
+              <OrganizerLayout>
+                <OpportunityAnalytics />
+              </OrganizerLayout>
+            </RoleRoute>
           } />
           <Route path="/search" element={
             <StudentLayout>

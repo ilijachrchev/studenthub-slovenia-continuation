@@ -4,6 +4,7 @@ import ReportCard from "../../../components/admin/moderation/ReportCard";
 import ReportDetail from "../../../components/admin/moderation/ReportDetail";
 import StatusBadge from "../../../components/shared/StatusBadge";
 import "./ModerationQueue.css";
+import { apiRequest } from "../../../lib/api";
 
 function safeJson(res) {
   return res.json().catch(() => ({}));
@@ -29,14 +30,7 @@ function ModerationQueue() {
   const [submitting, setSubmitting] = useState(false);
 
   const loadReports = useCallback(async (filter = statusFilter) => {
-    const res = await fetch(`/api/admin/moderation/reports?status=${encodeURIComponent(filter)}`, {
-      credentials: "include",
-    });
-    if (!res.ok) {
-      const data = await safeJson(res);
-      throw new Error(data.error || "Failed to load moderation queue.");
-    }
-    const data = await res.json();
+    const data = await apiRequest(`/api/admin/moderation/reports?status=${encodeURIComponent(filter)}`);
     const items = (data.reports || data.items || []).map(normalizeReport);
     setReports(items);
     setSelectedReport((current) => items.find((item) => String(item.id) === String(current?.id)) || items[0] || null);
@@ -60,12 +54,7 @@ function ModerationQueue() {
 
   const loadDetail = async (report) => {
     if (!report) return;
-    const res = await fetch(`/api/admin/moderation/reports/${report.id}`, { credentials: "include" });
-    if (!res.ok) {
-      const data = await safeJson(res);
-      throw new Error(data.error || "Failed to load report details.");
-    }
-    const data = await res.json();
+    const data = await apiRequest(`/api/admin/moderation/reports/${report.id}`);
     setSelectedReport(normalizeReport(data.report || data));
   };
 
@@ -91,21 +80,13 @@ function ModerationQueue() {
     );
     setSelectedReport((current) => (current ? { ...current, status: optimisticStatus } : current));
     try {
-      const res = await fetch(`/api/admin/moderation/reports/${selectedReport.id}/${endpoint}`, {
+      await apiRequest(`/api/admin/moderation/reports/${selectedReport.id}/${endpoint}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
+        body: {
           note: decisionNote.trim() || undefined,
           archive_opportunity: archiveOpportunity,
-        }),
+        },
       });
-      if (!res.ok) {
-        const data = await safeJson(res);
-        setReports(previousReports);
-        setActionError(data.error || "Failed to update moderation item.");
-        return;
-      }
       await loadReports(statusFilter);
       setDecision(null);
       setDecisionNote("");

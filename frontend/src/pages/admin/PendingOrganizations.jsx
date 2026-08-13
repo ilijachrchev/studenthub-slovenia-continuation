@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import PendingOrgCard from "../../components/admin/PendingOrgCard";
 import "./css/PendingOrganizations.css";
+import { apiRequest } from "../../lib/api";
 
 function PendingOrganizations() {
     const [organizations, setOrganizations] = useState([]);
@@ -8,14 +9,7 @@ function PendingOrganizations() {
     const [error, setError] = useState("");
 
     const loadPending = useCallback(async () => {
-        const res = await fetch("/api/admin/organizations/pending", {credentials: "include"});
-        if (!res.ok) {
-            const data = await res.json();
-            setError(data.error || "Failed to load pending organizations");
-            return;
-        }
-
-        const data = await res.json();
+        const data = await apiRequest("/api/admin/organizations/pending");
         setOrganizations(data.organizations);
     }, []);
 
@@ -35,15 +29,9 @@ function PendingOrganizations() {
     const handleApprove = async (id) => {
         setError("");
         try {
-            const res = await fetch(`/api/admin/organizations/${id}/approve`, {
+            await apiRequest(`/api/admin/organizations/${id}/approve`, {
                 method: "POST",
-                credentials: "include",
             });
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.error || "Failed to approve organizatio");
-                return;
-            }
             await loadPending();
         } catch {
             setError("Something wen wrong. Please try again");
@@ -53,15 +41,9 @@ function PendingOrganizations() {
     const handleReject = async (id) => {
         setError("");
         try {
-            const res = await fetch(`/api/admin/organizations/${id}/reject`, {
+            await apiRequest(`/api/admin/organizations/${id}/reject`, {
                 method: "POST",
-                credentials: "include",
             });
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.error || "Failed to reject organization.");
-                return;
-            }
             await loadPending();
         } catch {
             setError("Something went wrong. Please try again");

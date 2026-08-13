@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Star } from "../components/reusable/Icons";
 import "./css/Feedback.css";
+import { apiRequest } from "../lib/api";
 
 function Feedback() {
   const { eventId } = useParams();
@@ -20,15 +21,11 @@ function Feedback() {
     async function load() {
         try {
             const [eventRes, feedbackRes] = await Promise.all([
-                fetch(`/api/events/${eventId}`, {credentials: "include"}),
-                fetch(`/api/feedback/${eventId}`, {credentials: "include"}),
+                apiRequest(`/api/events/${eventId}`),
+                apiRequest(`/api/feedback/${eventId}`),
             ]);
-
-            const eventData = await eventRes.json();
-            const feedbackData = await feedbackRes.json();
-
-            if (eventRes.ok) setEvent(eventData);
-            if (feedbackData.feedback) setExisting(feedbackData.feedback);
+            setEvent(eventRes);
+            if (feedbackRes.feedback) setExisting(feedbackRes.feedback);
         } catch {
             setError("Failed to load this event");
         } finally {
@@ -47,19 +44,10 @@ function Feedback() {
 
     setSubmitting(true);
     try {
-        const res = await fetch(`/api/feedback/${eventId}`, {
+        await apiRequest(`/api/feedback/${eventId}`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ rating, comment: comment.trim() || null}),
+            body: { rating, comment: comment.trim() || null },
         });
-
-        const data = await res.json();
-        if (!res.ok) {
-            setError(data.error || "Failed to submit feedback");
-            setSubmitting(false);
-            return;
-        }
         setDone(true);
         setSubmitting(false);
     } catch {

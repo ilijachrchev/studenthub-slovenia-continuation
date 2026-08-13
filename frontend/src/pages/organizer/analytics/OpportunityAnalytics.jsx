@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import OrganizerLayout from "../../../components/layout/OrganizerLayout";
 import StatusBadge from "../../../components/shared/StatusBadge";
 import "./OpportunityAnalytics.css";
+import { apiRequest } from "../../../lib/api";
 
 function safeJson(res) {
   return res.json().catch(() => ({}));
@@ -76,12 +77,7 @@ function OpportunityAnalytics() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`/api/organizer/opportunities/${opportunityId}/analytics`, { credentials: "include" });
-        if (!res.ok) {
-          const data = await safeJson(res);
-          throw new Error(data.error || "Failed to load analytics.");
-        }
-        const data = await res.json();
+        const data = await apiRequest(`/api/organizer/opportunities/${opportunityId}/analytics`);
         if (ignore) return;
         setOpportunity(data.opportunity || data.opportunity_summary || null);
         setSummary(normalizeSummary(data.summary || data.analytics?.summary || data));

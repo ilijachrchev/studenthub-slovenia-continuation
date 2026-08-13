@@ -5,9 +5,9 @@ import {
   formatDateTime,
   normaliseApplication,
   toArray,
-  unwrapMessage,
 } from "../../components/opportunities/opportunitiesUtils";
 import "./css/opportunities.css";
+import { apiRequest } from "../../lib/api";
 
 function MyApplications() {
   const [applications, setApplications] = useState([]);
@@ -19,18 +19,8 @@ function MyApplications() {
 
     async function loadApplications() {
       try {
-        const response = await fetch("/api/opportunities/applications", {
-          credentials: "include",
-        });
-        const data = await response.json().catch(() => ({}));
-
+        const data = await apiRequest("/api/opportunities/applications");
         if (!alive) return;
-
-        if (!response.ok) {
-          setError(unwrapMessage(data, "Failed to load your applications"));
-          return;
-        }
-
         setApplications(toArray(data.applications || data.items || data).map(normaliseApplication));
       } catch {
         if (alive) setError("Failed to load your applications");
@@ -60,14 +50,9 @@ function MyApplications() {
     );
 
     try {
-      const response = await fetch(`/api/opportunities/${application.opportunityId}/apply`, {
+      await apiRequest(`/api/opportunities/${application.opportunityId}/apply`, {
         method: "DELETE",
-        credentials: "include",
       });
-
-      if (!response.ok) {
-        throw new Error("withdraw-failed");
-      }
     } catch {
       setApplications(previous);
     }

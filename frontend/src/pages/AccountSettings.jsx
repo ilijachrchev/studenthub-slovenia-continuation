@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import "./css/SetupFeed.css";
 import "./css/AccountSettings.css";
+import { apiRequest } from "../lib/api";
 
 function AccountSettings() {
   const [faculties, setFaculties] = useState([]);
@@ -20,24 +21,18 @@ function AccountSettings() {
     async function loadData() {
         try {
             const [facultiesRes, tagRes, profileRes] = await Promise.all([
-                fetch("/api/faculties"),
-                fetch("/api/tags"),
-                fetch("/api/student/profile", { credentials: "include"}),
+                apiRequest("/api/faculties"),
+                apiRequest("/api/tags"),
+                apiRequest("/api/student/profile"),
             ]);
 
-            const profile = await profileRes.json();
-            if (!profileRes.ok) {
-                setLoadError(profile.error || "Not logged in");
-                return;
-            }
+            setFaculties(facultiesRes);
+            setTags(tagRes);
 
-            setFaculties(await facultiesRes.json());
-            setTags(await tagRes.json());
-
-            if (profile.hasProfile) {
-                setFacultyId(String(profile.faculty_id));
-                setStudyYear(profile.study_year ? String(profile.study_year) : "");
-                setSelectedTags(profile.tag_ids || []);
+            if (profileRes.hasProfile) {
+                setFacultyId(String(profileRes.faculty_id));
+                setStudyYear(profileRes.study_year ? String(profileRes.study_year) : "");
+                setSelectedTags(profileRes.tag_ids || []);
             }
         } catch {
             setLoadError("Failed to load your settings");
@@ -65,23 +60,14 @@ function AccountSettings() {
     setSaving(true);
 
     try {
-        const res = await fetch("/api/student/profile", {
+        await apiRequest("/api/student/profile", {
             method: "PUT",
-            headers: {"Content-Type": "application/json"},
-            credentials: "include",
-            body: JSON.stringify({
+            body: {
                 faculty_id: Number(facultyId),
                 study_year: studyYear ? Number(studyYear) : null,
                 tag_ids: selectedTags,
-            }),
+            },
         });
-
-        const data = await res.json();
-        if (!res.ok) {
-            setError(data.error || "Failed to save changes");
-            setSaving(false);
-            return;
-        }
 
         setSuccess("Your preferences have been saved.");
         setSaving(false);

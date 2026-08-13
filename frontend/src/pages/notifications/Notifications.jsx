@@ -3,10 +3,10 @@ import {
   formatDateTime,
   normaliseNotification,
   toArray,
-  unwrapMessage,
 } from "../../components/opportunities/opportunitiesUtils";
 import ApplicationStatusBadge from "../../components/opportunities/ApplicationStatusBadge";
 import "./../opportunities/css/opportunities.css";
+import { apiRequest } from "../../lib/api";
 
 const DEFAULT_PREFERENCES = {
   application_updates: true,
@@ -27,23 +27,15 @@ function Notifications() {
     async function loadNotifications() {
       try {
         const [listRes, prefsRes] = await Promise.all([
-          fetch("/api/notifications", { credentials: "include" }),
-          fetch("/api/notifications/preferences", { credentials: "include" }),
+          apiRequest("/api/notifications"),
+          apiRequest("/api/notifications/preferences"),
         ]);
-        const listData = await listRes.json().catch(() => ({}));
-        const prefsData = await prefsRes.json().catch(() => ({}));
-
         if (!alive) return;
 
-        if (!listRes.ok) {
-          setError(unwrapMessage(listData, "Failed to load notifications"));
-          return;
-        }
-
-        setNotifications(toArray(listData.notifications || listData.items || listData).map(normaliseNotification));
+        setNotifications(toArray(listRes.notifications || listRes.items || listRes).map(normaliseNotification));
         setPreferences((current) => ({
           ...current,
-          ...(prefsData.preferences || prefsData),
+          ...(prefsRes.preferences || prefsRes),
         }));
       } catch {
         if (alive) setError("Failed to load notifications");
@@ -62,20 +54,15 @@ function Notifications() {
   useEffect(() => {
     const timer = setInterval(async () => {
       try {
-        const response = await fetch("/api/notifications?unread=1", {
-          credentials: "include",
-        });
-        const data = await response.json().catch(() => ({}));
-        if (response.ok) {
-          const unreadIds = new Set(
-            toArray(data.notifications || data.items || data).map((notification) =>
-              String(notification.id ?? notification.notification_id)
-            )
-          );
-          setNotifications((current) =>
-            current.map((item) => ({ ...item, unread: unreadIds.has(String(item.id)) }))
-          );
-        }
+        const data = await apiRequest("/api/notifications?unread=1");
+        const unreadIds = new Set(
+          toArray(data.notifications || data.items || data).map((notification) =>
+            String(notification.id ?? notification.notification_id)
+          )
+        );
+        setNotifications((current) =>
+          current.map((item) => ({ ...item, unread: unreadIds.has(String(item.id)) }))
+        );
       } catch (error) {
         void error;
       }
@@ -92,11 +79,9 @@ function Notifications() {
     );
 
     try {
-      const response = await fetch(`/api/notifications/${notification.id}/read`, {
+      await apiRequest(`/api/notifications/${notification.id}/read`, {
         method: "POST",
-        credentials: "include",
       });
-      if (!response.ok) throw new Error("read-failed");
     } catch {
       setNotifications((current) =>
         current.map((item) => (item.id === notification.id ? { ...item, unread: true } : item))
@@ -109,11 +94,9 @@ function Notifications() {
     setNotifications((current) => current.map((item) => ({ ...item, unread: false })));
 
     try {
-      const response = await fetch("/api/notifications/read-all", {
+      await apiRequest("/api/notifications/read-all", {
         method: "POST",
-        credentials: "include",
       });
-      if (!response.ok) throw new Error("read-all-failed");
     } catch {
       setNotifications(previous);
     }
@@ -125,13 +108,10 @@ function Notifications() {
     setSavingPreferences(true);
 
     try {
-      const response = await fetch("/api/notifications/preferences", {
+      await apiRequest("/api/notifications/preferences", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(nextPreferences),
+        body: nextPreferences,
       });
-      if (!response.ok) throw new Error("prefs-failed");
     } catch {
       setPreferences((current) => ({ ...current, [key]: preferences[key] }));
     } finally {

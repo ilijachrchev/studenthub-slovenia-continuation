@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Ticket from "../components/events/Ticket";
 import "./css/MyRegistrations.css";
+import { apiRequest } from "../lib/api";
 
 function MyRegistrations() {
     const [registrations, setRegistrations] = useState([]);
@@ -9,17 +10,10 @@ function MyRegistrations() {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        async function loadRegistrations() {
+    async function loadRegistrations() {
             try {
-                const res = await fetch("/api/registrations", 
-                    { credentials: "include"});
-                const data = await res.json();
-
-                if (!res.ok) {
-                    setError(data.error || "Failed to load your organizations");
-                } else {
-                    setRegistrations(data);
-                }
+                const data = await apiRequest("/api/registrations");
+                setRegistrations(data);
             } catch {
                 setError("Failed to load your registrations");
             } finally {

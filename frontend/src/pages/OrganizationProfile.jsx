@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import EventList from "../components/home/EventList";
 import "./css/OrganizationProfile.css";
+import { apiRequest } from "../lib/api";
 
 function OrganizationProfile() {
   const { id } = useParams();
@@ -15,16 +16,10 @@ function OrganizationProfile() {
   useEffect(() => {
     async function loadOrganization() {
         try {
-            const response = await fetch (`/api/organizations/${id}`);
-            const data = await response.json();
-
-            if (!response.ok) {
-                setError(data.error || "Failed to load organization");
-            } else {
-                setOrganization(data.organization);
-                setUpcoming(data.upcoming);
-                setPast(data.past);
-            }
+            const data = await apiRequest(`/api/organizations/${id}`);
+            setOrganization(data.organization);
+            setUpcoming(data.upcoming);
+            setPast(data.past);
         } catch {
             setError("Failed to load organization");
         } finally {

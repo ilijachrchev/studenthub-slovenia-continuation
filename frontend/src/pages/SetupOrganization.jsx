@@ -3,6 +3,7 @@ import { useState } from "react";
 import { GraduationCap } from "../components/reusable/Icons";
 import { useAuth } from "../context/AuthContext";
 import "./css/SetupFeed.css";
+import { apiRequest, getApiErrorMessage } from "../lib/api";
 
 
 function SetupOrganization() {
@@ -26,28 +27,18 @@ function SetupOrganization() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/organizations", {
+      await apiRequest("/api/organizations", {
         method: "POST",
-        headers: { "Content-Type": "application/json"},
-        credentials: "include",
-        body: JSON.stringify({
+        body: {
           name: name.trim(),
           description: description.trim() || null,
           website: website.trim() || null,
           contact_email: contactEmail.trim(),
-        }),
+        },
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || "Failed to submit application");
-        setLoading(false);
-        return;
-      }
-
       navigate("/application-status");
-    } catch {
+    } catch (error) {
       setError("Failed to submit application");
       setLoading(false);
     }

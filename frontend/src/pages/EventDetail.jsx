@@ -4,6 +4,7 @@ import EventTagList from "../components/events/EventTagList";
 import EventInfoBox from "../components/events/EventInfoBox";
 import EventRegistrationBox from "../components/events/EventRegistrationBox";
 import "./css/EventDetail.css";
+import { apiRequest } from "../lib/api";
 
 function EventDetail() {
   const { id } = useParams();
@@ -15,14 +16,8 @@ function EventDetail() {
   useEffect(() => {
     async function loadEvent() {
       try {
-        const response = await fetch(`/api/events/${id}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          setError(data.error || "Failed to load event");
-        } else {
-          setEvent(data);
-        }
+        const data = await apiRequest(`/api/events/${id}`);
+        setEvent(data);
       } catch {
         setError("Failed to load event");
       } finally {

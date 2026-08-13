@@ -4,6 +4,7 @@ import OrganizerLayout from "../../../components/layout/OrganizerLayout";
 import ApplicantList from "../../../components/organizer/opps/ApplicantList";
 import StatusBadge from "../../../components/shared/StatusBadge";
 import "./OpportunityApplicants.css";
+import { apiRequest } from "../../../lib/api";
 
 function safeJson(res) {
   return res.json().catch(() => ({}));
@@ -41,12 +42,7 @@ function OpportunityApplicants() {
   );
 
   const loadOpportunities = useCallback(async () => {
-    const res = await fetch("/api/organizer/opportunities", { credentials: "include" });
-    if (!res.ok) {
-      const data = await safeJson(res);
-      throw new Error(data.error || "Failed to load opportunities.");
-    }
-    const data = await res.json();
+    const data = await apiRequest("/api/organizer/opportunities");
     const items = (data.opportunities || data.items || []).map(normalizeOpportunity);
     setOpportunities(items);
     return items;
@@ -57,12 +53,7 @@ function OpportunityApplicants() {
       setApplicants([]);
       return;
     }
-    const res = await fetch(`/api/organizer/opportunities/${opportunityId}/applicants`, { credentials: "include" });
-    if (!res.ok) {
-      const data = await safeJson(res);
-      throw new Error(data.error || "Failed to load applicants.");
-    }
-    const data = await res.json();
+    const data = await apiRequest(`/api/organizer/opportunities/${opportunityId}/applicants`);
     const items = (data.applicants || data.items || []).map(normalizeApplicant);
     setApplicants(items);
     setSelectedApplicant((current) => items.find((item) => String(item.id) === String(current?.id)) || items[0] || null);
@@ -121,26 +112,16 @@ function OpportunityApplicants() {
     );
 
     try {
-      const res = await fetch(
+      const data = await apiRequest(
         `/api/organizer/opportunities/${selectedOpportunityId}/applicants/${selectedApplicant.id}/transition`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
+          body: {
             status: nextStatus,
             note: transitionNote.trim() || undefined,
-          }),
+          },
         },
       );
-      if (!res.ok) {
-        const data = await safeJson(res);
-        setApplicants(previousApplicants);
-        setSelectedApplicant(previousApplicants.find((item) => String(item.id) === String(optimisticId)) || null);
-        setActionError(data.error || "Failed to update applicant status.");
-        return;
-      }
-      const data = await res.json().catch(() => ({}));
       if (Array.isArray(data.applicants)) {
         setApplicants(data.applicants.map(normalizeApplicant));
       }

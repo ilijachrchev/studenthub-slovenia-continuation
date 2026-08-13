@@ -7,10 +7,19 @@ function Sidebar() {
 
     const links = [
         {label: 'Home', path: '/'},
-        {label: "Saved", path: '/saved'},
+        {label: "Opportunities", path: '/opportunities'},
+        {label: "Saved Events", path: '/saved'},
+        {label: "Saved Opportunities", path: '/saved-opportunities'},
         {label: "My Registrations", path: '/my-registrations'},
+        {label: "Applications", path: '/opportunities/applications'},
+        {label: "Notifications", path: '/notifications'},
         {label: "Settings", path: '/settings'},
     ];
+
+    const isActive = (path) =>
+        path === "/"
+            ? location.pathname === "/"
+            : location.pathname === path || location.pathname.startsWith(`${path}/`);
 
     return (
         <div className='app-sidebar'>
@@ -23,7 +32,7 @@ function Sidebar() {
                     <Link
                         key={link.path}
                         to={link.path}
-                        className={location.pathname === link.path ? "sidebar-link active" : "sidebar-link"}
+                        className={isActive(link.path) ? "sidebar-link active" : "sidebar-link"}
                     >
                         {link.label}
                     </Link>

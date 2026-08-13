@@ -1,6 +1,6 @@
 require("dotenv").config();
 
-const client = process.env.DB_CLIENT || "mysql2";
+const client = process.env.DB_CLIENT || "pg";
 const defaultPort = client === "pg" ? "5432" : "3306";
 
 module.exports = {

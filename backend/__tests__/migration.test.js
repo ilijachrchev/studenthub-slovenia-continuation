@@ -38,6 +38,7 @@ const REQUIRED_TABLES = [
   "bookmark",
   "registration",
   "feedback",
+  "session",
   "opportunity",
   "application",
   "application_history",

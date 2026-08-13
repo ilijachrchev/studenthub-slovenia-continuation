@@ -7,6 +7,8 @@ const fs = require('fs');
 
 const authRoutes = require("./routes/auth");
 const lookupRoutes = require("./routes/lookups");
+const applicationsRoutes = require("./routes/applications");
+const notificationsRoutes = require("./routes/notifications");
 const studentRoutes = require("./routes/student");
 const eventRoutes = require("./routes/events");
 const registrationsRoutes = require("./routes/registrations");
@@ -18,12 +20,29 @@ const bookmarksRoutes = require("./routes/bookmarks");
 const feedbackRoutes = require("./routes/feedback");
 const searchRoutes = require("./routes/search");
 const { validateOrigin } = require("./middleware/csrf");
+const PostgresSessionStore = require("./middleware/postgresSessionStore");
 const logger = require("./middleware/logger");
 const pinoHttp = require("pino-http");
 
 const db = require("./db");
 
 const app = express();
+const sessionCookieName = process.env.SESSION_COOKIE_NAME || "connect.sid";
+const apiRouteRegistry = [
+    { mount: "/api/auth", description: "Authentication" },
+    { mount: "/api", description: "Lookup routes" },
+    { mount: "/api/student", description: "Student profile" },
+    { mount: "/api/events", description: "Public events" },
+    { mount: "/api/registrations", description: "Event registrations" },
+    { mount: "/api/organizations", description: "Organization profiles" },
+    { mount: "/api/organizer", description: "Organizer tools" },
+    { mount: "/api/admin", description: "Admin moderation" },
+    { mount: "/api/bookmarks", description: "Saved events" },
+    { mount: "/api/feedback", description: "Event feedback" },
+    { mount: "/api/search", description: "Search" },
+    { mount: "/api/applications", description: "Opportunity applications" },
+    { mount: "/api/notifications", description: "Notifications" },
+];
 
 app.use(helmet({
     contentSecurityPolicy: false,
@@ -46,11 +65,18 @@ if (!sessionSecret) {
     console.warn("WARNING: Using default session secret. Set SESSION_SECRET in .env for production.");
 }
 
+const sessionStore = new PostgresSessionStore({
+    pool: db,
+    ttl: 24 * 60 * 60 * 1000,
+});
+
 app.use(
     session({
         secret: sessionSecret || "dev-only-insecure-secret",
         resave: false,
         saveUninitialized: false,
+        name: sessionCookieName,
+        store: sessionStore,
         cookie: {
             httpOnly: true,
             sameSite: "lax",
@@ -81,7 +107,11 @@ app.get('/api/health', async (req, res) => {
 });
 
 app.get('/api', (req, res) => {
-  res.json({ status: "ok", message: 'Hello from the backend, IT IS RUNNING :)!' });
+  res.json({
+    status: "ok",
+    message: "StudentHub Slovenia backend is running",
+    routes: apiRouteRegistry,
+  });
 });
 
 app.use("/api/auth", authRoutes);
@@ -96,6 +126,8 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/bookmarks", bookmarksRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/search", searchRoutes);
+app.use("/api/applications", applicationsRoutes);
+app.use("/api/notifications", notificationsRoutes);
 
 const reactBuildPath = path.join(__dirname, './dist');
 if (fs.existsSync(reactBuildPath)) {

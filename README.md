@@ -25,11 +25,11 @@ The core loop, end to end:
 | Layer | Technology |
 |---|---|
 | Frontend | React + Vite, `react-router-dom`, plain global CSS |
-| Backend | Node.js + Express, `express-session`, `bcryptjs`, `mysql2` |
+| Backend | Node.js + Express, `express-session`, `bcryptjs`, `knex`, `pg` |
 
 **Ports:** frontend dev server on **30010**, backend on **30011**.
 
-**Server:** hosted on the shared university server `88.200.63.148`. phpMyAdmin at `http://88.200.63.148/phpmyadmin`.
+**Server:** hosted on the shared university server `88.200.63.148`.
 
 ---
 
@@ -42,8 +42,8 @@ Browser (React, :30010)
 Vite dev proxy  ──►  Express API (:30011)
                           │
                           ▼
-                     MySQL / MariaDB
-                     (SISIII2026_89241041)
+                   PostgreSQL
+                   (primary runtime)
 ```
 
 - Auth is **session-based**: on login the server stores `req.session.user = { id, first_name, last_name, email, role }` and sets a cookie. Protected routes check the session; there is no JWT/token.
@@ -79,22 +79,24 @@ Event lifecycle status: `draft → submitted → published` or `rejected`.
 ## Setup
 
 ### Prerequisites
-Node.js + npm, Docker + Docker Compose (for local DB), and access to the MySQL database on `88.200.63.148`.
+Node.js + npm, Docker + Docker Compose (for local DB), and access to the PostgreSQL-backed runtime.
 
 ### Quick start with Docker
 
 The fastest way to get a local database running:
 
 ```bash
-docker compose up -d        # starts MySQL + backend (runs migrations + seeds automatically)
+docker compose up -d        # starts the PostgreSQL-backed stack and backend
 cd frontend && npm run dev  # frontend on :30010
 ```
 
 The Docker backend automatically:
-1. Waits for MySQL to be healthy
+1. Waits for PostgreSQL to be healthy
 2. Runs all pending migrations (`npm run db:migrate`)
 3. Seeds development data (`npm run db:seed`)
 4. Starts the server
+
+The compose file still includes a legacy MySQL service for compatibility checks, but the backend service is wired to PostgreSQL (`db-pg`).
 
 #### Docker workflow commands
 
@@ -129,7 +131,7 @@ cd frontend && npm run dev
 
 1. Create the database:
    ```bash
-   mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS SISIII2026_89241041 CHARACTER SET utf8 COLLATE utf8_unicode_ci;"
+   createdb SISIII2026_89241041
    ```
 
 2. Configure environment:
@@ -203,7 +205,8 @@ DB_HOST=localhost
 DB_USER=studenti
 DB_PASSWORD=********
 DB_DATABASE=SISIII2026_89241041
-DB_PORT=3306
+DB_PORT=5432
+DB_CLIENT=pg
 SESSION_SECRET=********
 FRONTEND_URL=http://localhost:30010
 PORT=30011
@@ -222,7 +225,7 @@ Then open the app at the frontend host (e.g. `http://88.200.63.148:30010`).
 
 ## Dependencies
 
-**Backend:** `express`, `mysql2`, `express-session`, `bcryptjs`, `dotenv`, plus Node's built-in `crypto` (ticket codes).
+**Backend:** `express`, `knex`, `pg`, `express-session`, `bcryptjs`, `dotenv`, plus Node's built-in `crypto` (ticket codes). The repository still keeps `mysql2` as a legacy compatibility dependency in configuration, but PostgreSQL is the active runtime target.
 
 **Frontend:** `react`, `react-dom`, `react-router-dom`, `vite`, `qrcode.react`.
 

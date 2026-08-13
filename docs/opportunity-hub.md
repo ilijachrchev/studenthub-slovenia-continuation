@@ -1,5 +1,7 @@
 # Opportunity Hub
 
+This document describes the target-state opportunity hub surface. In the current checkout, the frontend pages exist, but `frontend/src/App.jsx` does not route to them yet and `backend/app.js` does not mount the matching `/api/organizer/opportunities` or `/api/admin/moderation` router surfaces.
+
 The opportunity hub adds organizer and admin tooling for managing student-facing opportunities and the moderation workflow around them.
 
 ## Surfaces

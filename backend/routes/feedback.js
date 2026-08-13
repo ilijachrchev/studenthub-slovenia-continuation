@@ -3,18 +3,23 @@ const pool = require("../db");
 const { validateFeedback } = require("../middleware/validate");
 const catchAsync = require("../middleware/catchAsync");
 const { requireAuth } = require("../middleware/auth");
+const { parsePositiveInt } = require("../lib/parseId");
 
 const router = express.Router();
 
 // /api/feedback/:eventId GET method
 router.get("/:eventId", catchAsync(async (req, res) => {
+    const eventId = parsePositiveInt(req.params.eventId);
     if (!req.session.user) {
+        return res.json({feedback: null});
+    }
+    if (!eventId) {
         return res.json({feedback: null});
     }
 
     const { rows } = await pool.query(
         "SELECT id, rating, comment, submitted_at FROM feedback WHERE user_id = $1 AND event_id = $2",
-        [req.session.user.id, req.params.eventId]
+        [req.session.user.id, eventId]
     );
 
     res.json({feedback: rows.length ? rows[0] : null});
@@ -23,7 +28,10 @@ router.get("/:eventId", catchAsync(async (req, res) => {
 // /api/feedback/:eventId POST method
 router.post("/:eventId", requireAuth, catchAsync(async (req, res) => {
     const userId = req.session.user.id;
-    const eventId = req.params.eventId;
+    const eventId = parsePositiveInt(req.params.eventId);
+    if (!eventId) {
+        return res.status(404).json({error: "Event not found"});
+    }
     const { rating, comment } = req.body;
 
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {

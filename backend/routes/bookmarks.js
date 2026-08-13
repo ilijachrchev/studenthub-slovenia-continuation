@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
 const { requireAuth } = require("../middleware/auth");
+const { parsePositiveInt } = require("../lib/parseId");
 
 const router = express.Router();
 
@@ -43,7 +44,10 @@ router.get("/ids", catchAsync(async (req, res) => {
 // /api/bookmarks/:id POST method
 router.post("/:id", requireAuth, catchAsync(async (req, res) => {
     const userId = req.session.user.id;
-    const eventId = req.params.id;
+    const eventId = parsePositiveInt(req.params.id);
+    if (!eventId) {
+        return res.status(404).json({ error: "Event not found" });
+    }
 
     const { rows: existing } = await pool.query(
         "SELECT id FROM bookmark WHERE user_id = $1 AND event_id = $2",
@@ -63,9 +67,14 @@ router.post("/:id", requireAuth, catchAsync(async (req, res) => {
 
 // /api/bookmarks/:id DELETE method
 router.delete("/:id", requireAuth, catchAsync(async (req, res) => {
+    const eventId = parsePositiveInt(req.params.id);
+    if (!eventId) {
+        return res.status(404).json({error: "No saved event to remove"});
+    }
+
     const { rowCount } = await pool.query(
         "DELETE FROM bookmark WHERE user_id = $1 AND event_id = $2",
-        [req.session.user.id, req.params.id]
+        [req.session.user.id, eventId]
     );
 
     if (rowCount === 0) {

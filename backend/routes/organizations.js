@@ -3,6 +3,7 @@ const pool = require("../db");
 const { validateOrganization } = require("../middleware/validate");
 const catchAsync = require("../middleware/catchAsync");
 const { requireAuth, requireRole } = require("../middleware/auth");
+const { parsePositiveInt } = require("../lib/parseId");
 
 const router = express.Router();
 
@@ -60,7 +61,10 @@ router.get("/my-application", requireAuth, catchAsync(async (req, res) => {
 
 // /api/organizations GET method
 router.get("/:id", catchAsync(async (req, res) => {
-    const orgId = req.params.id;
+    const orgId = parsePositiveInt(req.params.id);
+    if (!orgId) {
+        return res.status(404).json({error: "Organization not found"});
+    }
 
     const { rows: orgRows } = await pool.query(
         `SELECT o.id, o.name, o.description, o.logo, o.website, o.contact_email,

@@ -3,6 +3,7 @@ const pool = require("../db");
 const crypto = require("crypto");
 const catchAsync = require("../middleware/catchAsync");
 const { requireAuth } = require("../middleware/auth");
+const { parsePositiveInt } = require("../lib/parseId");
 
 const router = express.Router();
 
@@ -21,7 +22,11 @@ function generateTicketCode() {
 
 // /api/registration/:id GET method
 router.get("/:id", catchAsync(async (req, res) => {
+    const eventId = parsePositiveInt(req.params.id);
     if (!req.session.user) {
+      return res.json({registration: null});
+    }
+    if (!eventId) {
       return res.json({registration: null});
     }
 
@@ -29,7 +34,7 @@ router.get("/:id", catchAsync(async (req, res) => {
       `SELECT id, user_id, event_id, registered_at, ticket_code, checked_in
        FROM registration
        WHERE user_id = $1 AND event_id = $2`,
-       [req.session.user.id, req.params.id]
+       [req.session.user.id, eventId]
     );
 
     res.json({registration: rows.length ? rows[0] : null});
@@ -39,7 +44,10 @@ router.get("/:id", catchAsync(async (req, res) => {
 // /api/register/:id POST method
 router.post("/:id", requireAuth, catchAsync(async (req, res) => {
     const userId = req.session.user.id;
-    const eventId = req.params.id;
+    const eventId = parsePositiveInt(req.params.id);
+    if (!eventId) {
+      return res.status(404).json({ error: "Event not found" });
+    }
 
     const { rows: eventRows } = await pool.query(
       "SELECT id, capacity, registration_type, status FROM event WHERE id = $1",
@@ -88,9 +96,14 @@ router.post("/:id", requireAuth, catchAsync(async (req, res) => {
 
 // /api/registration/:id DELETE method
 router.delete("/:id", requireAuth, catchAsync(async (req, res) => {
+    const eventId = parsePositiveInt(req.params.id);
+    if (!eventId) {
+      return res.status(404).json({error: "No registration to cancel"});
+    }
+
     const { rowCount } = await pool.query(
       "DELETE FROM registration WHERE user_id = $1 AND event_id = $2",
-      [req.session.user.id, req.params.id]
+      [req.session.user.id, eventId]
     );
     if (rowCount === 0) {
       return res.status(404).json({error: "No registration to cancel"})

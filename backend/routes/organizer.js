@@ -4,6 +4,7 @@ const { validateEvent } = require("../middleware/validate");
 const catchAsync = require("../middleware/catchAsync");
 const logger = require("../middleware/logger");
 const { requireRole } = require("../middleware/auth");
+const { parsePositiveInt } = require("../lib/parseId");
 
 const router = express.Router();
 
@@ -123,7 +124,10 @@ router.post("/events", requireOrganizer, catchAsync(async (req, res) => {
 // /api/organizer/events/:id POST method
 router.post("/events/:id/submit", requireOrganizer, catchAsync(async (req, res) => {
 
-    const eventId = req.params.id;
+    const eventId = parsePositiveInt(req.params.id);
+    if (!eventId) {
+        return res.status(404).json({error: "Event not found"});
+    }
 
     const { rows } = await pool.query(
         `SELECT e.id, e.status FROM event e

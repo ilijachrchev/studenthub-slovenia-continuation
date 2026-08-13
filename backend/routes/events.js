@@ -1,6 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
+const { parsePositiveInt } = require("../lib/parseId");
 
 const router = express.Router();
 
@@ -107,7 +108,10 @@ router.get("/", catchAsync(async (req, res) => {
 
 // /api/events/:id GET method
 router.get("/:id", catchAsync(async (req, res) => {
-    const eventId = req.params.id;
+    const eventId = parsePositiveInt(req.params.id);
+    if (!eventId) {
+      return res.status(404).json({ error: "Event not found" });
+    }
 
     const { rows } = await pool.query(
       `SELECT e.id, e.title, e.description, e.location,

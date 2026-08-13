@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
 const { requireAuth } = require("../middleware/auth");
+const { parsePositiveInt } = require("../lib/parseId");
 
 const router = express.Router();
 
@@ -74,13 +75,18 @@ router.get("/", requireAuth, catchAsync(async (req, res) => {
 }));
 
 router.post("/:id/read", requireAuth, catchAsync(async (req, res) => {
+  const notificationId = parsePositiveInt(req.params.id);
+  if (!notificationId) {
+    return res.status(404).json({ error: "Notification not found" });
+  }
+
   const { rowCount, rows } = await pool.query(
     `UPDATE notification
      SET is_read = true,
          read_at = COALESCE(read_at, NOW())
      WHERE id = $1 AND recipient_user_id = $2
      RETURNING id, recipient_user_id, type, payload, is_read, created_at, read_at`,
-    [req.params.id, req.session.user.id]
+    [notificationId, req.session.user.id]
   );
 
   if (rowCount === 0) {

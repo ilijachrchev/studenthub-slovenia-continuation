@@ -18,6 +18,9 @@ function normalizeReport(report) {
 
 function ModerationQueue() {
   const [statusFilter, setStatusFilter] = useState("open");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -28,8 +31,8 @@ function ModerationQueue() {
   const [archiveOpportunity, setArchiveOpportunity] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const loadReports = useCallback(async (filter = statusFilter) => {
-    const res = await fetch(`/api/admin/moderation/reports?status=${encodeURIComponent(filter)}`, {
+  const loadReports = useCallback(async (filter = statusFilter, nextPage = page, nextLimit = limit) => {
+    const res = await fetch(`/api/admin/moderation/reports?status=${encodeURIComponent(filter)}&page=${nextPage}&limit=${nextLimit}`, {
       credentials: "include",
     });
     if (!res.ok) {
@@ -39,8 +42,9 @@ function ModerationQueue() {
     const data = await res.json();
     const items = (data.reports || data.items || []).map(normalizeReport);
     setReports(items);
+    setTotal(Number(data.total || items.length));
     setSelectedReport((current) => items.find((item) => String(item.id) === String(current?.id)) || items[0] || null);
-  }, [statusFilter]);
+  }, [statusFilter, page, limit]);
 
   useEffect(() => {
     let ignore = false;
@@ -56,7 +60,7 @@ function ModerationQueue() {
     return () => {
       ignore = true;
     };
-  }, [loadReports, statusFilter]);
+  }, [loadReports, statusFilter, page, limit]);
 
   const loadDetail = async (report) => {
     if (!report) return;
@@ -129,6 +133,8 @@ function ModerationQueue() {
     [],
   );
 
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+
   if (loading) {
     return <p className="opp-status" role="status">Loading moderation queue...</p>;
   }
@@ -162,11 +168,30 @@ function ModerationQueue() {
               onChange={(event) => {
                 setLoading(true);
                 setStatusFilter(event.target.value);
+                setPage(1);
               }}
             >
               {filterOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Rows per page</span>
+            <select
+              className="input"
+              value={limit}
+              onChange={(event) => {
+                setLoading(true);
+                setLimit(Number(event.target.value));
+                setPage(1);
+              }}
+            >
+              {[5, 10, 20, 50].map((option) => (
+                <option key={option} value={option}>
+                  {option}
                 </option>
               ))}
             </select>
@@ -201,6 +226,37 @@ function ModerationQueue() {
                 ))}
               </div>
             )}
+            <div className="opp-actions" style={{ justifyContent: "space-between", marginTop: 16 }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  if (page > 1) {
+                    setLoading(true);
+                    setPage((current) => current - 1);
+                  }
+                }}
+                disabled={page <= 1}
+              >
+                Previous
+              </button>
+              <span className="opp-page-status" style={{ padding: 0 }}>
+                Page {page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  if (page < totalPages) {
+                    setLoading(true);
+                    setPage((current) => current + 1);
+                  }
+                }}
+                disabled={page >= totalPages}
+              >
+                Next
+              </button>
+            </div>
           </section>
 
           <ReportDetail

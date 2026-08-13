@@ -22,6 +22,11 @@ function OpportunityDetail() {
   const [related, setRelated] = useState([]);
   const [coverNote, setCoverNote] = useState("");
   const [error, setError] = useState("");
+  const [reportFormOpen, setReportFormOpen] = useState(false);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportCategory, setReportCategory] = useState("other");
+  const [reportSuccess, setReportSuccess] = useState("");
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -102,12 +107,53 @@ function OpportunityDetail() {
     }
   };
 
-  const reportOpportunity = opportunity
-    ? opportunity.reportUrl ||
-      `mailto:studenthub@example.com?subject=${encodeURIComponent(
-        `Report opportunity: ${opportunity.title}`
-      )}`
-    : "#";
+  const submitReport = async (event) => {
+    event.preventDefault();
+    if (!opportunity || reportSubmitting) return;
+
+    if (authLoading) return;
+
+    if (!user) {
+      navigate(`/login?next=${encodeURIComponent(`/opportunities/${opportunity.id}`)}`);
+      return;
+    }
+
+    setReportSubmitting(true);
+    setError("");
+    setReportSuccess("");
+
+    try {
+      const response = await fetch(`/api/opportunities/${opportunity.id}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          reason: reportReason,
+          category: reportCategory,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (response.status === 401 || response.status === 403) {
+        navigate(`/login?next=${encodeURIComponent(`/opportunities/${opportunity.id}`)}`);
+        return;
+      }
+
+      if (!response.ok) {
+        setError(unwrapMessage(data, "Failed to submit report"));
+        return;
+      }
+
+      setReportSuccess("Report submitted. An admin will review it.");
+      setReportReason("");
+      setReportCategory("other");
+      setReportFormOpen(false);
+    } catch {
+      setError("Failed to submit report");
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
 
   const applyOpportunity = async (event) => {
     event.preventDefault();
@@ -207,14 +253,19 @@ function OpportunityDetail() {
             <button type="button" className="opp-secondary-btn" onClick={saveOpportunity}>
               {saved ? "Saved" : "Save"}
             </button>
-            <a className="opp-secondary-btn" href={reportOpportunity} onClick={() => {
-              dispatchAnalytics("opportunity_report_clicked", {
-                opportunityId: opportunity.id,
-                title: opportunity.title,
-              });
-            }}>
+            <button
+              type="button"
+              className="opp-secondary-btn"
+              onClick={() => {
+                setReportFormOpen((current) => !current);
+                dispatchAnalytics("opportunity_report_clicked", {
+                  opportunityId: opportunity.id,
+                  title: opportunity.title,
+                });
+              }}
+            >
               Report
-            </a>
+            </button>
           </div>
         </div>
 
@@ -255,6 +306,57 @@ function OpportunityDetail() {
         </div>
 
         {error && <p className="opp-page-status error-text">{error}</p>}
+        {reportSuccess && <p className="opp-page-status" style={{ padding: 0 }}>{reportSuccess}</p>}
+
+        {reportFormOpen && (
+          <section className="opp-detail-section opp-panel">
+            <h2>Report this opportunity</h2>
+            <form className="opp-apply-form" onSubmit={submitReport}>
+              <label className="opp-field">
+                <span>Category</span>
+                <select
+                  className="input"
+                  value={reportCategory}
+                  onChange={(event) => setReportCategory(event.target.value)}
+                >
+                  <option value="other">Other</option>
+                  <option value="spam">Spam</option>
+                  <option value="harassment">Harassment</option>
+                  <option value="inaccurate">Inaccurate</option>
+                  <option value="duplicate">Duplicate</option>
+                  <option value="abuse">Abuse</option>
+                </select>
+              </label>
+              <label className="opp-field">
+                <span>Reason</span>
+                <textarea
+                  className="opp-detail-note"
+                  value={reportReason}
+                  onChange={(event) => setReportReason(event.target.value)}
+                  placeholder="Explain what looks wrong and why admins should review it."
+                  maxLength={2000}
+                  required
+                />
+              </label>
+              <div className="opp-actions">
+                <button type="submit" className="opp-primary-btn" disabled={reportSubmitting || !reportReason.trim()}>
+                  {reportSubmitting ? "Submitting..." : "Submit report"}
+                </button>
+                <button
+                  type="button"
+                  className="opp-secondary-btn"
+                  onClick={() => {
+                    setReportFormOpen(false);
+                    setReportReason("");
+                    setReportCategory("other");
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </section>
+        )}
 
         <section className="opp-detail-section opp-panel">
           <h2>Apply</h2>

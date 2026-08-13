@@ -13,12 +13,14 @@ import CreateEvent from "./pages/organizer/CreateEvent";
 import AdminLayout from "./components/layout/AdminLayout";
 import PendingEvents from "./pages/admin/PendingEvents";
 import PendingOrganizations from "./pages/admin/PendingOrganizations";
+import ModerationQueue from "./pages/admin/moderation/ModerationQueue";
 import AccountSettings from "./pages/AccountSettings";
 import Saved from "./pages/Saved";
 import Feedback from "./pages/Feedback";
 import OrganizationProfile from "./pages/OrganizationProfile";
 import SearchResults from "./pages/SearchResults";
 import ResetPassword from "./pages/ResetPassword";
+import OpportunityDetail from "./pages/opportunities/OpportunityDetail";
 import { AuthProvider } from "./context/AuthContext";
 import MyRegistrations from "./pages/MyRegistrations";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -58,6 +60,11 @@ export default function App() {
               <EventDetail />
             </StudentLayout>  
           } />
+          <Route path="/opportunities/:id" element={
+            <StudentLayout>
+              <OpportunityDetail />
+            </StudentLayout>
+          } />
           <Route path="/organizations/:id" element={
             <StudentLayout>
               <OrganizationProfile />
@@ -95,6 +102,13 @@ export default function App() {
             <RoleRoute allowedRoles={["admin"]}>
               <AdminLayout>
                 <PendingOrganizations />
+              </AdminLayout>
+            </RoleRoute>
+          } />
+          <Route path="/admin/moderation" element={
+            <RoleRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <ModerationQueue />
               </AdminLayout>
             </RoleRoute>
           } />

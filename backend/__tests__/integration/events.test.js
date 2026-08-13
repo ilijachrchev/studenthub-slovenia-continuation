@@ -1,10 +1,5 @@
 const request = require("supertest");
 const app = require("../../app");
-const pool = require("../../db");
-
-afterAll(async () => {
-  await pool.end();
-});
 
 describe("GET /api/events", () => {
   test("returns published events with pagination metadata", async () => {

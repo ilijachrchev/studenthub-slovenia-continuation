@@ -65,7 +65,6 @@ afterAll(async () => {
     "DELETE FROM \"user\" WHERE email IN ($1, $2, $3)",
     ["authz-admin@test.com", "authz-organizer@test.com", "authz-student@famnit.upr.si"]
   );
-  await pool.end();
 });
 
 describe("Authorization middleware", () => {

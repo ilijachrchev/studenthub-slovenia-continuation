@@ -1,7 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function RejectModal({event, onCancel, onConfirm, loading}) {
     const [reason, setReason] = useState("");
+    const textareaRef = useRef(null);
+
+    useEffect(() => {
+        textareaRef.current?.focus();
+    }, []);
 
     return (
         <div className="modal-overlay" onClick={onCancel}>
@@ -12,6 +17,12 @@ function RejectModal({event, onCancel, onConfirm, loading}) {
                 aria-modal="true"
                 aria-labelledby="reject-modal-title"
                 aria-describedby="reject-modal-description"
+                onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                        event.stopPropagation();
+                        onCancel();
+                    }
+                }}
             >
                 <h3 id="reject-modal-title">Reject "{event.title}"</h3>
                 <p className="modal-subtitle">
@@ -21,6 +32,7 @@ function RejectModal({event, onCancel, onConfirm, loading}) {
                     Provide a concise explanation for the rejection decision.
                 </p>
                 <textarea
+                    ref={textareaRef}
                     className="input"
                     rows={4}
                     value={reason}

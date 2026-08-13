@@ -13,13 +13,12 @@ function formatDateTime(value) {
 
 function ApplicantList({ applicants, selectedId, onSelect }) {
   return (
-    <ul className="applicant-list" role="listbox" aria-label="Applicants">
+    <ul className="applicant-list" aria-label="Applicants">
       {applicants.map((applicant) => (
         <li key={applicant.id}>
           <button
             type="button"
-            role="option"
-            aria-selected={selectedId === applicant.id}
+            aria-pressed={selectedId === applicant.id}
             className={selectedId === applicant.id ? "applicant-row active" : "applicant-row"}
             onClick={() => onSelect(applicant)}
           >

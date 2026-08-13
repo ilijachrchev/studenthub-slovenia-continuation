@@ -16,8 +16,7 @@ function ReportCard({ report, active, onOpen }) {
     <li>
       <button
         type="button"
-        role="option"
-        aria-selected={active}
+        aria-pressed={active}
         className={active ? "report-card active" : "report-card"}
         onClick={() => onOpen(report)}
       >

@@ -82,6 +82,15 @@ function OpportunityForm({ opportunity, onSubmit, onCancel, saving, serverError 
   const contactEmailId = "opportunity-contact-email";
   const applyUrlId = "opportunity-apply-url";
   const tagsId = "opportunity-tags";
+  const titleErrorId = "opportunity-title-error";
+  const descriptionErrorId = "opportunity-description-error";
+  const locationErrorId = "opportunity-location-error";
+  const capacityErrorId = "opportunity-capacity-error";
+  const deadlineErrorId = "opportunity-deadline-error";
+  const startDateErrorId = "opportunity-start-date-error";
+  const endDateErrorId = "opportunity-end-date-error";
+  const contactEmailErrorId = "opportunity-contact-email-error";
+  const applyUrlErrorId = "opportunity-apply-url-error";
 
   const update = (field) => (event) => {
     const value = event.target.type === "checkbox" ? event.target.checked : event.target.value;
@@ -131,8 +140,16 @@ function OpportunityForm({ opportunity, onSubmit, onCancel, saving, serverError 
       <form className="opp-form" onSubmit={handleSubmit}>
         <label>
           <span>Title</span>
-          <input id={titleId} className="input" value={form.title} onChange={update("title")} maxLength={120} aria-invalid={Boolean(fieldError("title"))} />
-          {fieldError("title") && <small>{fieldError("title")}</small>}
+          <input
+            id={titleId}
+            className="input"
+            value={form.title}
+            onChange={update("title")}
+            maxLength={120}
+            aria-invalid={Boolean(fieldError("title"))}
+            aria-describedby={fieldError("title") ? titleErrorId : undefined}
+          />
+          {fieldError("title") && <small id={titleErrorId}>{fieldError("title")}</small>}
         </label>
         <label>
           <span>Summary</span>
@@ -140,33 +157,81 @@ function OpportunityForm({ opportunity, onSubmit, onCancel, saving, serverError 
         </label>
         <label className="opp-form-span-2">
           <span>Description</span>
-          <textarea id={descriptionId} className="input" rows={5} value={form.description} onChange={update("description")} aria-invalid={Boolean(fieldError("description"))} />
-          {fieldError("description") && <small>{fieldError("description")}</small>}
+          <textarea
+            id={descriptionId}
+            className="input"
+            rows={5}
+            value={form.description}
+            onChange={update("description")}
+            aria-invalid={Boolean(fieldError("description"))}
+            aria-describedby={fieldError("description") ? descriptionErrorId : undefined}
+          />
+          {fieldError("description") && <small id={descriptionErrorId}>{fieldError("description")}</small>}
         </label>
         <label>
           <span>Location</span>
-          <input id={locationId} className="input" value={form.location} onChange={update("location")} aria-invalid={Boolean(fieldError("location"))} />
-          {fieldError("location") && <small>{fieldError("location")}</small>}
+          <input
+            id={locationId}
+            className="input"
+            value={form.location}
+            onChange={update("location")}
+            aria-invalid={Boolean(fieldError("location"))}
+            aria-describedby={fieldError("location") ? locationErrorId : undefined}
+          />
+          {fieldError("location") && <small id={locationErrorId}>{fieldError("location")}</small>}
         </label>
         <label>
           <span>Capacity</span>
-          <input id={capacityId} className="input" type="number" min="1" value={form.capacity} onChange={update("capacity")} aria-invalid={Boolean(fieldError("capacity"))} />
-          {fieldError("capacity") && <small>{fieldError("capacity")}</small>}
+          <input
+            id={capacityId}
+            className="input"
+            type="number"
+            min="1"
+            value={form.capacity}
+            onChange={update("capacity")}
+            aria-invalid={Boolean(fieldError("capacity"))}
+            aria-describedby={fieldError("capacity") ? capacityErrorId : undefined}
+          />
+          {fieldError("capacity") && <small id={capacityErrorId}>{fieldError("capacity")}</small>}
         </label>
         <label>
           <span>Application deadline</span>
-          <input id={deadlineId} className="input" type="datetime-local" value={form.application_deadline} onChange={update("application_deadline")} aria-invalid={Boolean(fieldError("application_deadline"))} />
-          {fieldError("application_deadline") && <small>{fieldError("application_deadline")}</small>}
+          <input
+            id={deadlineId}
+            className="input"
+            type="datetime-local"
+            value={form.application_deadline}
+            onChange={update("application_deadline")}
+            aria-invalid={Boolean(fieldError("application_deadline"))}
+            aria-describedby={fieldError("application_deadline") ? deadlineErrorId : undefined}
+          />
+          {fieldError("application_deadline") && <small id={deadlineErrorId}>{fieldError("application_deadline")}</small>}
         </label>
         <label>
           <span>Start date</span>
-          <input id={startDateId} className="input" type="datetime-local" value={form.start_date} onChange={update("start_date")} aria-invalid={Boolean(fieldError("start_date"))} />
-          {fieldError("start_date") && <small>{fieldError("start_date")}</small>}
+          <input
+            id={startDateId}
+            className="input"
+            type="datetime-local"
+            value={form.start_date}
+            onChange={update("start_date")}
+            aria-invalid={Boolean(fieldError("start_date"))}
+            aria-describedby={fieldError("start_date") ? startDateErrorId : undefined}
+          />
+          {fieldError("start_date") && <small id={startDateErrorId}>{fieldError("start_date")}</small>}
         </label>
         <label>
           <span>End date</span>
-          <input id={endDateId} className="input" type="datetime-local" value={form.end_date} onChange={update("end_date")} aria-invalid={Boolean(fieldError("end_date"))} />
-          {fieldError("end_date") && <small>{fieldError("end_date")}</small>}
+          <input
+            id={endDateId}
+            className="input"
+            type="datetime-local"
+            value={form.end_date}
+            onChange={update("end_date")}
+            aria-invalid={Boolean(fieldError("end_date"))}
+            aria-describedby={fieldError("end_date") ? endDateErrorId : undefined}
+          />
+          {fieldError("end_date") && <small id={endDateErrorId}>{fieldError("end_date")}</small>}
         </label>
         <label>
           <span>Compensation</span>
@@ -174,13 +239,28 @@ function OpportunityForm({ opportunity, onSubmit, onCancel, saving, serverError 
         </label>
         <label>
           <span>Contact email</span>
-          <input id={contactEmailId} className="input" type="email" value={form.contact_email} onChange={update("contact_email")} aria-invalid={Boolean(fieldError("contact_email"))} />
-          {fieldError("contact_email") && <small>{fieldError("contact_email")}</small>}
+          <input
+            id={contactEmailId}
+            className="input"
+            type="email"
+            value={form.contact_email}
+            onChange={update("contact_email")}
+            aria-invalid={Boolean(fieldError("contact_email"))}
+            aria-describedby={fieldError("contact_email") ? contactEmailErrorId : undefined}
+          />
+          {fieldError("contact_email") && <small id={contactEmailErrorId}>{fieldError("contact_email")}</small>}
         </label>
         <label>
           <span>Application link</span>
-          <input id={applyUrlId} className="input" value={form.apply_url} onChange={update("apply_url")} aria-invalid={Boolean(fieldError("apply_url"))} />
-          {fieldError("apply_url") && <small>{fieldError("apply_url")}</small>}
+          <input
+            id={applyUrlId}
+            className="input"
+            value={form.apply_url}
+            onChange={update("apply_url")}
+            aria-invalid={Boolean(fieldError("apply_url"))}
+            aria-describedby={fieldError("apply_url") ? applyUrlErrorId : undefined}
+          />
+          {fieldError("apply_url") && <small id={applyUrlErrorId}>{fieldError("apply_url")}</small>}
         </label>
         <label className="opp-form-span-2">
           <span>Tags</span>

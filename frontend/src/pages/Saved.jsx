@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import EventCard from "../components/home/EventCard";
+import { apiRequest, getApiErrorMessage } from "../lib/api";
 import "./css/Home.css";
 
 function Saved() {
@@ -8,30 +9,28 @@ function Saved() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const controller = new AbortController();
     async function load() {
         try {
-            const res = await fetch("/api/bookmarks", { credentials: "include"});
-            const data = await res.json();
-            if (!res.ok) {
-                setError(data.error || "Failed to load saved events");
-            } else {
-                setEvents(data);
-            }
-        } catch {
-            setError("Failed to load saved events")
+            const data = await apiRequest("/api/bookmarks", { signal: controller.signal });
+            setEvents(data);
+        } catch (error) {
+            if (controller.signal.aborted || error?.code === "aborted") return;
+            setError(getApiErrorMessage(error, "Failed to load saved events"))
         } finally {
             setLoading(false);
         }
     }
     load();
+
+    return () => controller.abort();
   }, []);
 
   const handleToggleSave = async (eventId) => {
     setEvents((prev) => prev.filter((e) => e.id !== eventId));
     try {
-        await fetch(`/api/bookmarks/${eventId}`, {
+        await apiRequest(`/api/bookmarks/${eventId}`, {
             method: "DELETE",
-            credentials: "include",
         });
     } catch {
         // Ignore delete failures; the UI is already updated optimistically.

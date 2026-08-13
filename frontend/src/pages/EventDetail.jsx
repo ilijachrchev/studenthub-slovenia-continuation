@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import EventTagList from "../components/events/EventTagList";
 import EventInfoBox from "../components/events/EventInfoBox";
 import EventRegistrationBox from "../components/events/EventRegistrationBox";
+import { apiRequest, getApiErrorMessage } from "../lib/api";
 import "./css/EventDetail.css";
 
 function EventDetail() {
@@ -13,24 +14,22 @@ function EventDetail() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
     async function loadEvent() {
       try {
-        const response = await fetch(`/api/events/${id}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          setError(data.error || "Failed to load event");
-        } else {
-          setEvent(data);
-        }
-      } catch {
-        setError("Failed to load event");
+        const data = await apiRequest(`/api/events/${id}`, { signal: controller.signal });
+        setEvent(data);
+      } catch (error) {
+        if (controller.signal.aborted || error?.code === "aborted") return;
+        setError(getApiErrorMessage(error, "Failed to load event"));
       } finally {
         setLoading(false);
       }
     }
 
     loadEvent();
+
+    return () => controller.abort();
   }, [id]);
 
   const formatDate = (dateString) =>

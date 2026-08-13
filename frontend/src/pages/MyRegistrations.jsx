@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Ticket from "../components/events/Ticket";
+import { apiRequest, getApiErrorMessage } from "../lib/api";
 import "./css/MyRegistrations.css";
 
 function MyRegistrations() {
@@ -9,24 +10,21 @@ function MyRegistrations() {
     const [error, setError] = useState("");
 
     useEffect(() => {
+        const controller = new AbortController();
         async function loadRegistrations() {
             try {
-                const res = await fetch("/api/registrations", 
-                    { credentials: "include"});
-                const data = await res.json();
-
-                if (!res.ok) {
-                    setError(data.error || "Failed to load your organizations");
-                } else {
-                    setRegistrations(data);
-                }
-            } catch {
-                setError("Failed to load your registrations");
+                const data = await apiRequest("/api/registrations", { signal: controller.signal });
+                setRegistrations(data);
+            } catch (error) {
+                if (controller.signal.aborted || error?.code === "aborted") return;
+                setError(getApiErrorMessage(error, "Failed to load your registrations"));
             } finally {
                 setLoading(false);
             }
         }
         loadRegistrations();
+
+        return () => controller.abort();
     }, []);
 
     const formatDate = (dateString) =>

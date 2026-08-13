@@ -1,44 +1,41 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { GraduationCap } from "../components/reusable/Icons";
 import "./css/Login.css";
 import { useAuth } from "../context/AuthContext";
+import { apiRequest, getApiErrorMessage } from "../lib/api";
+import { getRoleHomePath } from "../lib/auth";
 
 function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const {refreshUser} = useAuth();
+  const { refreshUser } = useAuth();
+  const sessionMessage =
+    searchParams.get("reason") === "session-expired"
+      ? "Your session expired. Please sign in again."
+      : "";
+  const nextPath = searchParams.get("next") || "";
 
   const handleLogin = async () => {
     setError("");
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const data = await apiRequest("/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json"},
-        body: JSON.stringify({email, password}),
+        body: { email, password },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error);
-        setLoading(false);
-        return;
-      }
-
-      await refreshUser();
-
-      const role = data.user.role;
-      navigate(role === "organizer" ? "/organizer" : role === "admin" ? "/admin" : "/");
-    } catch {
-      setError("Something went wrong. Please try again!")
+      await refreshUser({ silent: true });
+      navigate(nextPath.startsWith("/") ? nextPath : getRoleHomePath(data.user?.role));
+    } catch (error) {
+      setError(getApiErrorMessage(error, "Something went wrong. Please try again!"));
       setLoading(false);
     }
   };
@@ -59,6 +56,7 @@ function Login() {
         </div>
 
         <div className="login-form">
+          {sessionMessage && <p className="setup-subtitle">{sessionMessage}</p>}
           <input
             className="input"
             type="email"

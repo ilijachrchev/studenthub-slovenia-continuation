@@ -4,6 +4,7 @@ import { Wave } from "../components/reusable/Icons";
 import EventList from "../components/home/EventList";
 import HomeHero from "../components/home/HomeHero";
 import HomeFilters from "../components/home/HomeFilters";
+import { apiRequest, getApiErrorMessage } from "../lib/api";
 import "./css/Home.css";
 
 function Home() {
@@ -20,48 +21,41 @@ function Home() {
   const [savedIds, setSavedIds] = useState([]);
 
   useEffect(() => {
+    const controller = new AbortController();
     async function loadEvents() {
       try {
         const [eventsRes, tagsRes, savedRes] = await Promise.all([
-          fetch("/api/events?page=1&limit=20", { credentials: "include" }),
-          fetch("/api/tags"),
-          fetch("/api/bookmarks/ids", {credentials: "include"}),
+          apiRequest("/api/events?page=1&limit=20", { signal: controller.signal }),
+          apiRequest("/api/tags", { signal: controller.signal }),
+          apiRequest("/api/bookmarks/ids", { signal: controller.signal }),
         ]);
 
-        const eventsData = await eventsRes.json();
-        const tagsData = await tagsRes.json();
-        const savedData = await savedRes.json();
-
-        if (!eventsRes.ok) {
-          setError(eventsData.error || "Failed to load events");
-        } else {
-          setEvents(eventsData.events || []);
-          setHasMore(eventsData.events.length < eventsData.total);
-          setPage(1);
-          setTags(Array.isArray(tagsData) ? tagsData : []);
-          setSavedIds(savedData.ids || []);
-        }
-      } catch {
-        setError("Failed to load events");
+        setEvents(eventsRes.events || []);
+        setHasMore((eventsRes.events || []).length < (eventsRes.total || 0));
+        setPage(1);
+        setTags(Array.isArray(tagsRes) ? tagsRes : []);
+        setSavedIds(savedRes.ids || []);
+      } catch (error) {
+        if (controller.signal.aborted || error?.code === "aborted") return;
+        setError(getApiErrorMessage(error, "Failed to load events"));
       } finally {
         setLoading(false);
       }
     }
 
     loadEvents();
+
+    return () => controller.abort();
   }, []);
 
   const loadMore = async () => {
     const nextPage = page + 1;
     setLoadingMore(true);
     try {
-      const res = await fetch(`/api/events?page=${nextPage}&limit=20`, { credentials: "include" });
-      const data = await res.json();
-      if (res.ok) {
-        setEvents((prev) => [...prev, ...(data.events || [])]);
-        setPage(nextPage);
-        setHasMore(data.events.length > 0 && (nextPage * 20) < data.total);
-      }
+      const data = await apiRequest(`/api/events?page=${nextPage}&limit=20`);
+      setEvents((prev) => [...prev, ...(data.events || [])]);
+      setPage(nextPage);
+      setHasMore((data.events || []).length > 0 && (nextPage * 20) < (data.total || 0));
     } catch {
       // silently fail — existing events remain
     } finally {
@@ -76,16 +70,9 @@ function Home() {
     );
 
     try {
-      const res = await fetch(`/api/bookmarks/${eventId}`, {
+      await apiRequest(`/api/bookmarks/${eventId}`, {
         method: isSaved ? "DELETE" : "POST",
-        credentials: "include",
       });
-
-      if (!res.ok) {
-        setSavedIds((prev) =>
-          isSaved ? [...prev, eventId] : prev.filter((id) => id !== eventId)
-        );
-      }
     } catch {
       setSavedIds((prev) =>
         isSaved ? [...prev, eventId] : prev.filter((id) => id !== eventId)

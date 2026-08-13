@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Ticket from "./Ticket";
+import { apiRequest, getApiErrorMessage } from "../../lib/api";
 
 function EventRegistrationBox({ event }) {
 
@@ -15,14 +16,14 @@ function EventRegistrationBox({ event }) {
       return;
     }
 
+    const controller = new AbortController();
+
     async function loadRegistration() {
       try { 
-        const res = await fetch(`/api/registrations/${event.id}`, {
-          credentials: "include",
-        });
-        const data = await res.json();
+        const data = await apiRequest(`/api/registrations/${event.id}`, { signal: controller.signal });
         setRegistration(data.registration);
-      } catch {
+      } catch (error) {
+        if (controller.signal.aborted || error?.code === "aborted") return;
         // Intentionally ignore fetch failures here.
       } finally {
         setLoading(false);
@@ -30,25 +31,19 @@ function EventRegistrationBox({ event }) {
     }
 
     loadRegistration();
+    return () => controller.abort();
   }, [event.id, event.registration_type]);
 
   const handleRegister = async () => {
     setError("");
     setWorking(true);
     try {
-      const res = await fetch(`/api/registrations/${event.id}`, {
+      const data = await apiRequest(`/api/registrations/${event.id}`, {
         method: "POST",
-        credentials: "include",
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Could not register");
-      } else {
-        setRegistration(data);
-      }
-    } catch {
-      setError("Could not register. Please try again.");
+      setRegistration(data);
+    } catch (error) {
+      setError(getApiErrorMessage(error, "Could not register. Please try again."));
     } finally {
       setWorking(false);
     }
@@ -58,19 +53,12 @@ function EventRegistrationBox({ event }) {
     setError("");
     setWorking(true);
     try {
-      const res = await fetch(`/api/registrations/${event.id}`, {
+      await apiRequest(`/api/registrations/${event.id}`, {
         method: "DELETE",
-        credentials: "include",
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || "Could not cancel");
-      } else {
-        setRegistration(null);
-      }
-    } catch {
-      setError("Could not cancel. Please try again.");
+      setRegistration(null);
+    } catch (error) {
+      setError(getApiErrorMessage(error, "Could not cancel. Please try again."));
     } finally {
       setWorking(false);
     }

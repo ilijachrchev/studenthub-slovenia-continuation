@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Star } from "../components/reusable/Icons";
+import { apiRequest, getApiErrorMessage } from "../lib/api";
 import "./css/Feedback.css";
 
 function Feedback() {
@@ -17,25 +18,25 @@ function Feedback() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     async function load() {
         try {
             const [eventRes, feedbackRes] = await Promise.all([
-                fetch(`/api/events/${eventId}`, {credentials: "include"}),
-                fetch(`/api/feedback/${eventId}`, {credentials: "include"}),
+                apiRequest(`/api/events/${eventId}`, { signal: controller.signal }),
+                apiRequest(`/api/feedback/${eventId}`, { signal: controller.signal }),
             ]);
-
-            const eventData = await eventRes.json();
-            const feedbackData = await feedbackRes.json();
-
-            if (eventRes.ok) setEvent(eventData);
-            if (feedbackData.feedback) setExisting(feedbackData.feedback);
-        } catch {
-            setError("Failed to load this event");
+            setEvent(eventRes);
+            if (feedbackRes.feedback) setExisting(feedbackRes.feedback);
+        } catch (error) {
+            if (controller.signal.aborted || error?.code === "aborted") return;
+            setError(getApiErrorMessage(error, "Failed to load this event"));
         } finally {
             setLoading(false);
         }
     }
     load();
+
+    return () => controller.abort();
   }, [eventId]);
 
   const handleSubmit= async () => {
@@ -47,23 +48,14 @@ function Feedback() {
 
     setSubmitting(true);
     try {
-        const res = await fetch(`/api/feedback/${eventId}`, {
+        await apiRequest(`/api/feedback/${eventId}`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ rating, comment: comment.trim() || null}),
+            body: { rating, comment: comment.trim() || null},
         });
-
-        const data = await res.json();
-        if (!res.ok) {
-            setError(data.error || "Failed to submit feedback");
-            setSubmitting(false);
-            return;
-        }
         setDone(true);
         setSubmitting(false);
-    } catch {
-        setError("Failed to submit feedback");
+    } catch (error) {
+        setError(getApiErrorMessage(error, "Failed to submit feedback"));
         setSubmitting(false);
     }
   };

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiRequest, getApiErrorMessage } from "../lib/api";
 import "./css/SetupFeed.css";
 import "./css/AccountSettings.css";
 
@@ -17,35 +18,32 @@ function AccountSettings() {
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
+    const controller = new AbortController();
     async function loadData() {
         try {
             const [facultiesRes, tagRes, profileRes] = await Promise.all([
-                fetch("/api/faculties"),
-                fetch("/api/tags"),
-                fetch("/api/student/profile", { credentials: "include"}),
+                apiRequest("/api/faculties", { signal: controller.signal }),
+                apiRequest("/api/tags", { signal: controller.signal }),
+                apiRequest("/api/student/profile", { signal: controller.signal }),
             ]);
+            setFaculties(facultiesRes);
+            setTags(tagRes);
 
-            const profile = await profileRes.json();
-            if (!profileRes.ok) {
-                setLoadError(profile.error || "Not logged in");
-                return;
+            if (profileRes.hasProfile) {
+                setFacultyId(String(profileRes.faculty_id));
+                setStudyYear(profileRes.study_year ? String(profileRes.study_year) : "");
+                setSelectedTags(profileRes.tag_ids || []);
             }
-
-            setFaculties(await facultiesRes.json());
-            setTags(await tagRes.json());
-
-            if (profile.hasProfile) {
-                setFacultyId(String(profile.faculty_id));
-                setStudyYear(profile.study_year ? String(profile.study_year) : "");
-                setSelectedTags(profile.tag_ids || []);
-            }
-        } catch {
-            setLoadError("Failed to load your settings");
+        } catch (error) {
+            if (controller.signal.aborted || error?.code === "aborted") return;
+            setLoadError(getApiErrorMessage(error, "Failed to load your settings"));
         } finally {
             setLoading(false);
         }
     }
     loadData();
+
+    return () => controller.abort();
   }, []);
 
   const toggleTag = (tagId) => {
@@ -65,28 +63,18 @@ function AccountSettings() {
     setSaving(true);
 
     try {
-        const res = await fetch("/api/student/profile", {
+        await apiRequest("/api/student/profile", {
             method: "PUT",
-            headers: {"Content-Type": "application/json"},
-            credentials: "include",
-            body: JSON.stringify({
+            body: {
                 faculty_id: Number(facultyId),
                 study_year: studyYear ? Number(studyYear) : null,
                 tag_ids: selectedTags,
-            }),
+            },
         });
-
-        const data = await res.json();
-        if (!res.ok) {
-            setError(data.error || "Failed to save changes");
-            setSaving(false);
-            return;
-        }
-
         setSuccess("Your preferences have been saved.");
         setSaving(false);
-    } catch {
-        setError("Failed to save changes");
+    } catch (error) {
+        setError(getApiErrorMessage(error, "Failed to save changes"));
         setSaving(false);
     }
   };

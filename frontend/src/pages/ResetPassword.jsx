@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { GraduationCap } from "../components/reusable/Icons";
 import "./css/Login.css";
+import { apiRequest, getApiErrorMessage } from "../lib/api";
 
 function ResetPassword() {
   const [email, setEmail] = useState("");
@@ -22,31 +23,22 @@ function ResetPassword() {
 
     setLoading(true);
     try {
-      const response = await fetch("/api/auth/reset-password", {
+      await apiRequest("/api/auth/reset-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           email,
           current_password: currentPassword,
           new_password: newPassword,
-        }),
+        },
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error);
-        setLoading(false);
-        return;
-      }
 
       setSuccess("Password updated. You can now log in.");
       setEmail("");
       setCurrentPassword("");
       setNewPassword("");
       setLoading(false);
-    } catch {
-      setError("Something went wrong. Please try again!");
+    } catch (error) {
+      setError(getApiErrorMessage(error, "Something went wrong. Please try again!"));
       setLoading(false);
     }
   };

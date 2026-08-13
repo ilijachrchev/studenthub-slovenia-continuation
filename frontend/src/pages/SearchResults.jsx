@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import EventList from "../components/home/EventList";
+import { apiRequest, getApiErrorMessage } from "../lib/api";
 
 function SearchResults() {
   const [searchParams] = useSearchParams();
@@ -20,16 +21,10 @@ function SearchResults() {
         setError("");
 
         try {
-            const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-            const data = await response.json();
-            if (!response.ok) {
-                setError(data.error || "Seach failed");
-            } else {
-                setEvents(data.events || []);
-            }
+            const data = await apiRequest(`/api/search?q=${encodeURIComponent(query)}`);
+            setEvents(data.events || []);
         } catch (error) {
-            void error;
-            setError("Search failed");
+            setError(getApiErrorMessage(error, "Search failed"));
         } finally {
             setLoading(false);
         }

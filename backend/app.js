@@ -14,6 +14,9 @@ const eventRoutes = require("./routes/events");
 const registrationsRoutes = require("./routes/registrations");
 const organizationsRoutes = require("./routes/organizations");
 const opportunityRoutes = require("./routes/opportunities");
+const recommendationsRoutes = require("./routes/recommendations");
+const analyticsRoutes = require("./routes/analytics");
+const moderationRoutes = require("./routes/moderation");
 const organizerRoutes = require("./routes/organizer");
 const adminRoutes = require("./routes/admin");
 const bookmarksRoutes = require("./routes/bookmarks");
@@ -35,6 +38,10 @@ const apiRouteRegistry = [
     { mount: "/api/events", description: "Public events" },
     { mount: "/api/registrations", description: "Event registrations" },
     { mount: "/api/organizations", description: "Organization profiles" },
+    { mount: "/api/opportunities", description: "Opportunity discovery and applications" },
+    { mount: "/api/recommendations", description: "Opportunity recommendations" },
+    { mount: "/api/analytics", description: "Opportunity analytics" },
+    { mount: "/api/moderation", description: "Moderation workflow" },
     { mount: "/api/organizer", description: "Organizer tools" },
     { mount: "/api/admin", description: "Admin moderation" },
     { mount: "/api/bookmarks", description: "Saved events" },
@@ -128,6 +135,9 @@ app.use("/api/feedback", feedbackRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/applications", applicationsRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/api/recommendations", recommendationsRoutes);
+app.use("/api", analyticsRoutes);
+app.use("/api", moderationRoutes);
 
 const reactBuildPath = path.join(__dirname, './dist');
 if (fs.existsSync(reactBuildPath)) {

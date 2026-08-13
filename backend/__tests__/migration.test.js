@@ -38,6 +38,10 @@ const REQUIRED_TABLES = [
   "bookmark",
   "registration",
   "feedback",
+  "opportunity_bookmark",
+  "opportunity_report",
+  "opportunity_event",
+  "moderation_audit_log",
 ];
 
 describe("Migration lifecycle", () => {
@@ -110,7 +114,7 @@ describe("Migration lifecycle", () => {
       "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
     );
     const tableNames = rows.map((r) => r.tablename);
-    for (const table of ["opportunity_bookmark", "opportunity_report", "opportunity_event"]) {
+    for (const table of ["opportunity_bookmark", "opportunity_report", "opportunity_event", "moderation_audit_log"]) {
       expect(tableNames).toContain(table);
     }
   });

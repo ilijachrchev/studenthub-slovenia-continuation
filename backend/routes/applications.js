@@ -339,7 +339,7 @@ router.delete("/:id/apply", requireAuth, requireRole("student"), catchAsync(asyn
 
     await insertHistory(
       client,
-      applicationId,
+      application.id,
       "status_transition",
       transition.from,
       transition.to,

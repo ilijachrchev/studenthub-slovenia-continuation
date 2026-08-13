@@ -602,16 +602,22 @@ async function runOpportunityLifecycleAction(req, res, nextStatus, fieldName) {
       return res.status(400).json({ error: "Opportunity cannot be closed in its current state" });
     }
 
-    await client.query(
+    const { rowCount } = await client.query(
       `UPDATE opportunity
        SET status = $1,
            published_at = CASE WHEN $1 IN ('submitted', 'published') AND published_at IS NULL THEN NOW() ELSE published_at END,
            closed_at = CASE WHEN $1 = 'closed' THEN NOW() ELSE closed_at END,
            archived_at = CASE WHEN $1 = 'archived' THEN NOW() ELSE archived_at END,
            updated_at = NOW()
-       WHERE id = $2`,
-      [nextStatus, opportunityId]
+       WHERE id = $2
+         AND status = $3`,
+      [nextStatus, opportunityId, current.status]
     );
+
+    if (rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ error: "Opportunity status has changed" });
+    }
 
     await client.query("COMMIT");
     return res.json({ message: `Opportunity ${fieldName}`, status: nextStatus });

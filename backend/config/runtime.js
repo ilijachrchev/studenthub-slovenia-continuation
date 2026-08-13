@@ -4,7 +4,7 @@ const DEFAULT_FRONTEND_URL = "http://localhost:30010";
 const DEFAULT_SESSION_SECRET = "dev-only-insecure-secret";
 const DEFAULT_PORT = 30011;
 const DEFAULT_DB_PORT = 5432;
-const ALLOWED_DB_CLIENTS = new Set(["pg", "mysql2"]);
+const ALLOWED_DB_CLIENTS = new Set(["pg"]);
 
 function parseBoolean(value) {
   if (value == null) {
@@ -53,7 +53,7 @@ function nonEmpty(value) {
 }
 
 function buildDatabaseConfig({ strict, errors }) {
-  const client = process.env.DB_CLIENT || (strict ? null : "pg");
+  const client = process.env.DB_CLIENT || "pg";
   if (client && !ALLOWED_DB_CLIENTS.has(client)) {
     errors.push(`DB_CLIENT must be one of: ${Array.from(ALLOWED_DB_CLIENTS).join(", ")}`);
   }
@@ -122,10 +122,6 @@ function getRuntimeConfig({ strict = false } = {}) {
   }
 
   const db = buildDatabaseConfig({ strict: enforceProductionRules, errors });
-
-  if (production && db.client !== "pg") {
-    errors.push("DB_CLIENT must be pg in production");
-  }
 
   if (errors.length > 0) {
     const error = new Error(`Invalid production configuration: ${errors.join("; ")}`);

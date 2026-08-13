@@ -14,7 +14,7 @@ jobs:
       DB_HOST: localhost
       DB_PORT: 5433
       DB_USER: studenti
-      DB_PASSWORD: studentipass
+      DB_PASS: studentipass
       DB_DATABASE: studenthub_test
       TEST_DB_ALREADY_PREPARED: true
       SESSION_SECRET: test-secret
@@ -31,7 +31,7 @@ jobs:
         ports:
           - 5433:5432
         options: >-
-          --health-cmd="pg_isready -U studenti -d SISIII2026_89241041"
+          --health-cmd="pg_isready -U studenti -d studenthub_test"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5

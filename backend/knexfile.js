@@ -1,7 +1,7 @@
 require("dotenv").config();
 
 const client = process.env.DB_CLIENT || "pg";
-const defaultPort = client === "pg" ? "5432" : "3306";
+const defaultPort = "5432";
 
 module.exports = {
   development: {

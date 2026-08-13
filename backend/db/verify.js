@@ -23,6 +23,14 @@ const REQUIRED_TABLES = [
   "bookmark",
   "registration",
   "feedback",
+  "opportunity",
+  "application",
+  "application_history",
+  "notification_preferences",
+  "notification",
+  "opportunity_report",
+  "opportunity_bookmark",
+  "moderation_audit_log",
 ];
 
 const REQUIRED_INDEXES = [

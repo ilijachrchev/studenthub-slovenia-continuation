@@ -35,6 +35,14 @@ exports.seed = async function (knex) {
     "bookmark",
     "registration",
     "feedback",
+    "opportunity",
+    "application",
+    "application_history",
+    "notification_preferences",
+    "notification",
+    "opportunity_report",
+    "opportunity_bookmark",
+    "moderation_audit_log",
   ];
 
   const missingTables = [];
@@ -158,4 +166,42 @@ exports.seed = async function (knex) {
   await knex("feedback").insert([
     { user_id: 3, event_id: 6, rating: 5, comment: "Great intro to VR, looking forward to more!" },
   ]).onConflict(["user_id", "event_id"]).ignore();
+
+  if (await knex.schema.hasTable("opportunity")) {
+    await knex("opportunity").insert([
+      {
+        id: 1,
+        organization_id: 1,
+        title: "Open Source Fellowship",
+        description: "Join a semester-long mentorship program with real community projects.",
+        location: "Koper",
+        status: "published",
+        deadline: "2027-03-01 23:59:00",
+        created_at: knex.fn.now(),
+        published_at: knex.fn.now(),
+      },
+      {
+        id: 2,
+        organization_id: 1,
+        title: "Community App Jam",
+        description: "Weekend build sprint for student software projects.",
+        location: "FAMNIT Lab 2, Koper",
+        status: "published",
+        deadline: "2027-04-15 23:59:00",
+        created_at: knex.fn.now(),
+        published_at: knex.fn.now(),
+      },
+      {
+        id: 3,
+        organization_id: 3,
+        title: "Pending Opportunity Draft",
+        description: "This item exists to exercise moderation and visibility filters.",
+        location: "Maribor",
+        status: "draft",
+        deadline: "2027-05-15 23:59:00",
+        created_at: knex.fn.now(),
+        published_at: null,
+      },
+    ]).onConflict("id").ignore();
+  }
 };

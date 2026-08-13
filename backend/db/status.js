@@ -8,16 +8,17 @@
 
 const knex = require("knex");
 
-const config = require("../knexfile").development;
+const env = process.env.NODE_ENV === "test" ? "test" : "development";
+const config = require("../knexfile")[env];
 
 async function status() {
   const db = knex(config);
 
   try {
-    const [batchNo] = await db.migrate.currentBatchNumber();
+    const currentVersion = await db.migrate.currentVersion();
     const [completed, pending] = await db.migrate.list(config.migrations.directory);
 
-    console.log(`Current batch: ${batchNo}\n`);
+    console.log(`Current version: ${currentVersion}\n`);
 
     console.log(`Applied migrations (${completed.length}):`);
     if (completed.length === 0) {

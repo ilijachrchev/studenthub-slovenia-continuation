@@ -6,6 +6,8 @@
 
 const knex = require("knex");
 
+const env = process.env.NODE_ENV === "test" ? "test" : "development";
+const config = require("../knexfile")[env];
 const REQUIRED_TABLES = [
   "university",
   "faculty",
@@ -23,6 +25,10 @@ const REQUIRED_TABLES = [
   "bookmark",
   "registration",
   "feedback",
+  "opportunity_bookmark",
+  "opportunity_report",
+  "opportunity_event",
+  "moderation_audit_log",
 ];
 
 const REQUIRED_INDEXES = [
@@ -34,10 +40,12 @@ const REQUIRED_INDEXES = [
   { table: "registration", index: "idx_registration_event" },
   { table: "event", index: "idx_event_status_start" },
   { table: "event", index: "idx_event_org_status" },
+  { table: "opportunity_report", index: "uniq_opportunity_report_active" },
+  { table: "moderation_audit_log", index: "idx_moderation_audit_resource" },
+  { table: "moderation_audit_log", index: "idx_moderation_audit_actor" },
 ];
 
 async function verify() {
-  const config = require("../knexfile").development;
   const db = knex(config);
 
   const errors = [];
@@ -46,10 +54,10 @@ async function verify() {
   try {
     // Check migration status
     console.log("Checking migration status...");
-    const [batchNo] = await db.migrate.currentBatchNumber();
-    const completedMigrations = await db.migrate.list();
-    console.log(`  Current batch: ${batchNo}`);
-    console.log(`  Completed migrations: ${completedMigrations[1].length}`);
+    const currentVersion = await db.migrate.currentVersion();
+    const completedMigrations = await db.migrate.list(config.migrations.directory);
+    console.log(`  Current version: ${currentVersion}`);
+    console.log(`  Completed migrations: ${completedMigrations[0].length}`);
 
     // Check required tables
     console.log("\nChecking required tables...");

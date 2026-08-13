@@ -4,13 +4,10 @@ import OrganizerLayout from "../../../components/layout/OrganizerLayout";
 import OpportunityCard from "../../../components/organizer/opps/OpportunityCard";
 import OpportunityForm from "../../../components/organizer/opps/OpportunityForm";
 import StatusBadge from "../../../components/shared/StatusBadge";
+import { apiRequest, getApiErrorMessage } from "../../../lib/api";
 import "./ManageOpportunities.css";
 
 const EMPTY_OPPORTUNITY = null;
-
-function safeJson(res) {
-  return res.json().catch(() => ({}));
-}
 
 function normalizeOpportunity(opportunity) {
   return {
@@ -32,29 +29,27 @@ function ManageOpportunities() {
   const [actionError, setActionError] = useState("");
   const [selectedOpportunity, setSelectedOpportunity] = useState(EMPTY_OPPORTUNITY);
 
-  const loadOpportunities = useCallback(async () => {
-    const res = await fetch("/api/organizer/opportunities", { credentials: "include" });
-    if (!res.ok) {
-      const data = await safeJson(res);
-      throw new Error(data.error || "Failed to load opportunities.");
-    }
-    const data = await res.json();
+  const loadOpportunities = useCallback(async (signal) => {
+    const data = await apiRequest("/api/organizer/opportunities", { signal });
     setOpportunities((data.opportunities || data.items || []).map(normalizeOpportunity));
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
     let ignore = false;
     (async () => {
       try {
-        await loadOpportunities();
+        await loadOpportunities(controller.signal);
       } catch (err) {
-        if (!ignore) setError(err.message || "Something went wrong.");
+        if (controller.signal.aborted || err?.code === "aborted") return;
+        if (!ignore) setError(getApiErrorMessage(err, "Something went wrong."));
       } finally {
         if (!ignore) setLoading(false);
       }
     })();
     return () => {
       ignore = true;
+      controller.abort();
     };
   }, [loadOpportunities]);
 
@@ -78,21 +73,14 @@ function ManageOpportunities() {
     setActionError("");
     try {
       const isEdit = Boolean(selectedOpportunity?.id);
-      const res = await fetch(isEdit ? `/api/organizer/opportunities/${selectedOpportunity.id}` : "/api/organizer/opportunities", {
+      await apiRequest(isEdit ? `/api/organizer/opportunities/${selectedOpportunity.id}` : "/api/organizer/opportunities", {
         method: isEdit ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
+        body: payload,
       });
-      if (!res.ok) {
-        const data = await safeJson(res);
-        setActionError(data.error || "Unable to save opportunity.");
-        return;
-      }
       await loadOpportunities();
       resetForm();
-    } catch {
-      setActionError("Something went wrong. Please try again.");
+    } catch (error) {
+      setActionError(getApiErrorMessage(error, "Something went wrong. Please try again."));
     } finally {
       setSaving(false);
     }
@@ -101,18 +89,12 @@ function ManageOpportunities() {
   const runAction = async (opportunity, endpoint, method = "POST") => {
     setActionError("");
     try {
-      const res = await fetch(`/api/organizer/opportunities/${opportunity.id}/${endpoint}`, {
+      await apiRequest(`/api/organizer/opportunities/${opportunity.id}/${endpoint}`, {
         method,
-        credentials: "include",
       });
-      if (!res.ok) {
-        const data = await safeJson(res);
-        setActionError(data.error || `Failed to ${endpoint} opportunity.`);
-        return;
-      }
       await loadOpportunities();
-    } catch {
-      setActionError("Something went wrong. Please try again.");
+    } catch (error) {
+      setActionError(getApiErrorMessage(error, "Something went wrong. Please try again."));
     }
   };
 

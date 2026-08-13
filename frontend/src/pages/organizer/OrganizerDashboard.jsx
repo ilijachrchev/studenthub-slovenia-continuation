@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { apiRequest, getApiErrorMessage } from "../../lib/api";
 import "./css/OrganizerDashboard.css";
 
 const STATUS_GROUPS = [
@@ -26,53 +27,43 @@ function OrganizerDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
-    const loadEvents = useCallback(async () => {
-        const res = await fetch("/api/organizer/events", { credentials: "include"});
-        if (!res.ok) {
-            const data = await res.json();
-            setError(data.error || "Failed to load events");
-            return;
-        }
-        const data = await res.json();
-        setEvents(data.events);
+    const loadEvents = useCallback(async (signal) => {
+        const data = await apiRequest("/api/organizer/events", { signal });
+        setEvents(data.events || []);
     }, []);
 
     useEffect(() => {
+        const controller = new AbortController();
         async function init() {
             try {
-                const orgRes = await fetch("/api/organizations/my-application", {credentials: "include"});
-                if (orgRes.ok) {
-                    const orgData = await orgRes.json();
+                const orgData = await apiRequest("/api/organizations/my-application", {
+                    signal: controller.signal,
+                });
 
-                    if (orgData.hasApplication) {
-                        setOrganization(orgData.organization);
-                    }
+                if (orgData.hasApplication) {
+                    setOrganization(orgData.organization);
                 }
-                await loadEvents();
-            } catch {
-                setError("Something went wrong. Please try again.");
+                await loadEvents(controller.signal);
+            } catch (error) {
+                if (controller.signal.aborted || error?.code === "aborted") return;
+                setError(getApiErrorMessage(error, "Something went wrong. Please try again."));
             } finally {
                 setLoading(false);
             }
         }
         init();
+        return () => controller.abort();
     }, [loadEvents]);
 
     const handleSubmit = async (eventId) => {
         try {
-            const res = await fetch(`/api/organizer/events/${eventId}/submit`, {
+            await apiRequest(`/api/organizer/events/${eventId}/submit`, {
                 method: "POST",
-                credentials: "include",
             });
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.error || "Filaed to submit event");
-                return;
-            }
             setError("");
             await loadEvents();
-        } catch {
-            setError("Something went wrong. Please try again")
+        } catch (error) {
+            setError(getApiErrorMessage(error, "Something went wrong. Please try again"));
         }
     }
 

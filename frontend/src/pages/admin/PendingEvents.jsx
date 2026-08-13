@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import PendingEventCard from "../../components/admin/PendingEventCard";
 import RejectModal from "../../components/admin/RejectModal";
+import { apiRequest, getApiErrorMessage } from "../../lib/api";
 import "./css/PendingEvents.css";
 
 function PendingEvents() {
@@ -10,45 +11,36 @@ function PendingEvents() {
     const [rejectingEvent, setRejectingEvent] = useState(null);
     const [actionLoading, setActionLoading] = useState(false);
 
-    const loadPending = useCallback(async () => {
-        const res = await fetch("/api/admin/events/pending", {credentials: "include"});
-        if (!res.ok) {
-            const data = await res.json();
-            setError(data.error || "Failed to load pending events");
-            return;
-        }
-        const data = await res.json();
-        setEvents(data.events);
+    const loadPending = useCallback(async (signal) => {
+        const data = await apiRequest("/api/admin/events/pending", { signal });
+        setEvents(data.events || []);
     }, []);
 
     useEffect(() => {
+        const controller = new AbortController();
         async function init() {
             try {
-                await loadPending();
-            } catch {
-                setError("Something went wrong. Please try again")
+                await loadPending(controller.signal);
+            } catch (error) {
+                if (controller.signal.aborted || error?.code === "aborted") return;
+                setError(getApiErrorMessage(error, "Something went wrong. Please try again"));
             } finally {
                 setLoading(false);
             }
         }
         init();
+        return () => controller.abort();
     }, [loadPending]);
 
     const handleApprove = async (id) => {
         setError("");
         try {
-            const res = await fetch(`/api/admin/events/${id}/approve`, {
+            await apiRequest(`/api/admin/events/${id}/approve`, {
                 method: "POST",
-                credentials: "include",
             });
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.error || "Failed to approve event");
-                return;
-            }
             await loadPending();
-        } catch {
-            setError("Something went wrong. Please try again")
+        } catch (error) {
+            setError(getApiErrorMessage(error, "Something went wrong. Please try again"));
         }
     };
 
@@ -57,23 +49,15 @@ function PendingEvents() {
         setActionLoading(true);
         setError("");
         try {
-            const res = await fetch(`/api/admin/events/${rejectingEvent.id}/reject`, {
+            await apiRequest(`/api/admin/events/${rejectingEvent.id}/reject`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json"},
-                credentials: "include",
-                body: JSON.stringify({reason}),
+                body: { reason },
             });
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.error || "Failed to reject event");
-                setActionLoading(false);
-                return;
-            }
-            setActionLoading(false);
             setRejectingEvent(null);
             await loadPending();
-        } catch {
-            setError("Something went wrong. Please try again.");
+        } catch (error) {
+            setError(getApiErrorMessage(error, "Something went wrong. Please try again."));
+        } finally {
             setActionLoading(false);
         }
     };

@@ -3,11 +3,8 @@ import AdminLayout from "../../../components/layout/AdminLayout";
 import ReportCard from "../../../components/admin/moderation/ReportCard";
 import ReportDetail from "../../../components/admin/moderation/ReportDetail";
 import StatusBadge from "../../../components/shared/StatusBadge";
+import { apiRequest, getApiErrorMessage } from "../../../lib/api";
 import "./ModerationQueue.css";
-
-function safeJson(res) {
-  return res.json().catch(() => ({}));
-}
 
 function normalizeReport(report) {
   return {
@@ -29,43 +26,34 @@ function ModerationQueue() {
   const [submitting, setSubmitting] = useState(false);
 
   const loadReports = useCallback(async (filter = statusFilter) => {
-    const res = await fetch(`/api/admin/moderation/reports?status=${encodeURIComponent(filter)}`, {
-      credentials: "include",
-    });
-    if (!res.ok) {
-      const data = await safeJson(res);
-      throw new Error(data.error || "Failed to load moderation queue.");
-    }
-    const data = await res.json();
+    const data = await apiRequest(`/api/admin/moderation/reports?status=${encodeURIComponent(filter)}`);
     const items = (data.reports || data.items || []).map(normalizeReport);
     setReports(items);
     setSelectedReport((current) => items.find((item) => String(item.id) === String(current?.id)) || items[0] || null);
   }, [statusFilter]);
 
   useEffect(() => {
+    const controller = new AbortController();
     let ignore = false;
     (async () => {
       try {
-        await loadReports();
+        await loadReports(statusFilter);
       } catch (err) {
-        if (!ignore) setError(err.message || "Something went wrong.");
+        if (controller.signal.aborted || err?.code === "aborted") return;
+        if (!ignore) setError(getApiErrorMessage(err, "Something went wrong."));
       } finally {
         if (!ignore) setLoading(false);
       }
     })();
     return () => {
       ignore = true;
+      controller.abort();
     };
   }, [loadReports, statusFilter]);
 
   const loadDetail = async (report) => {
     if (!report) return;
-    const res = await fetch(`/api/admin/moderation/reports/${report.id}`, { credentials: "include" });
-    if (!res.ok) {
-      const data = await safeJson(res);
-      throw new Error(data.error || "Failed to load report details.");
-    }
-    const data = await res.json();
+    const data = await apiRequest(`/api/admin/moderation/reports/${report.id}`);
     setSelectedReport(normalizeReport(data.report || data));
   };
 
@@ -91,28 +79,20 @@ function ModerationQueue() {
     );
     setSelectedReport((current) => (current ? { ...current, status: optimisticStatus } : current));
     try {
-      const res = await fetch(`/api/admin/moderation/reports/${selectedReport.id}/${endpoint}`, {
+      await apiRequest(`/api/admin/moderation/reports/${selectedReport.id}/${endpoint}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
+        body: {
           note: decisionNote.trim() || undefined,
           archive_opportunity: archiveOpportunity,
-        }),
+        },
       });
-      if (!res.ok) {
-        const data = await safeJson(res);
-        setReports(previousReports);
-        setActionError(data.error || "Failed to update moderation item.");
-        return;
-      }
       await loadReports(statusFilter);
       setDecision(null);
       setDecisionNote("");
       setArchiveOpportunity(false);
-    } catch {
+    } catch (err) {
       setReports(previousReports);
-      setActionError("Something went wrong. Please try again.");
+      setActionError(getApiErrorMessage(err, "Something went wrong. Please try again."));
     } finally {
       setSubmitting(false);
     }

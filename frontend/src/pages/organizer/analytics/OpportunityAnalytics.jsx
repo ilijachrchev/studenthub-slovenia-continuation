@@ -2,11 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import OrganizerLayout from "../../../components/layout/OrganizerLayout";
 import StatusBadge from "../../../components/shared/StatusBadge";
+import { apiRequest, getApiErrorMessage } from "../../../lib/api";
 import "./OpportunityAnalytics.css";
-
-function safeJson(res) {
-  return res.json().catch(() => ({}));
-}
 
 function pickSeries(data) {
   return data.timeseries || data.timeline || data.series || [];
@@ -66,6 +63,7 @@ function OpportunityAnalytics() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const controller = new AbortController();
     let ignore = false;
     (async () => {
       if (!opportunityId) {
@@ -76,25 +74,24 @@ function OpportunityAnalytics() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`/api/organizer/opportunities/${opportunityId}/analytics`, { credentials: "include" });
-        if (!res.ok) {
-          const data = await safeJson(res);
-          throw new Error(data.error || "Failed to load analytics.");
-        }
-        const data = await res.json();
+        const data = await apiRequest(`/api/organizer/opportunities/${opportunityId}/analytics`, {
+          signal: controller.signal,
+        });
         if (ignore) return;
         setOpportunity(data.opportunity || data.opportunity_summary || null);
         setSummary(normalizeSummary(data.summary || data.analytics?.summary || data));
         setFunnel(pickFunnel(data));
         setTimeseries(pickSeries(data));
       } catch (err) {
-        if (!ignore) setError(err.message || "Something went wrong.");
+        if (controller.signal.aborted || err?.code === "aborted") return;
+        if (!ignore) setError(getApiErrorMessage(err, "Something went wrong."));
       } finally {
         if (!ignore) setLoading(false);
       }
     })();
     return () => {
       ignore = true;
+      controller.abort();
     };
   }, [opportunityId]);
 

@@ -12,6 +12,9 @@ function OrganizerSidebar() {
         { label: "Analytics", path: "/organizer/opportunities/analytics" },
     ];
 
+    const isActive = (path) =>
+        location.pathname === path || location.pathname.startsWith(`${path}/`);
+
     return (
         <div className="app-sidebar">
             <div className="sidebar-logo">
@@ -23,7 +26,7 @@ function OrganizerSidebar() {
                     <Link
                         key={link.path}
                         to={link.path}
-                        className={location.pathname === link.path ? "sidebar-link active" : "sidebar-link"}
+                        className={isActive(link.path) ? "sidebar-link active" : "sidebar-link"}
                     >
                         {link.label}
                     </Link>

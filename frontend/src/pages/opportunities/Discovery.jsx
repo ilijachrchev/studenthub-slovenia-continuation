@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import OpportunityCard from "../../components/opportunities/OpportunityCard";
 import OpportunityFilters from "../../components/opportunities/OpportunityFilters";
@@ -8,6 +8,7 @@ import {
   normaliseOpportunityList,
   unwrapMessage,
 } from "../../components/opportunities/opportunitiesUtils";
+import PageState, { InlineState } from "../../components/shared/PageState";
 import "./css/opportunities.css";
 
 const PAGE_SIZE = 12;
@@ -20,86 +21,120 @@ const INITIAL_FILTERS = {
   deadline: "",
 };
 
+async function safeJson(response) {
+  return response.json().catch(() => ({}));
+}
+
 function Discovery() {
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [opportunities, setOpportunities] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
+  const [savedIds, setSavedIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState("");
+  const [pageError, setPageError] = useState("");
+  const [auxError, setAuxError] = useState("");
+  const [loadMoreError, setLoadMoreError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [savedIds, setSavedIds] = useState([]);
-  const pendingBookmarkRef = useRef(new Map());
+
+  const loadDiscovery = useCallback(async () => {
+    setLoading(true);
+    setPageError("");
+    setAuxError("");
+    setLoadMoreError("");
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      params.set("limit", String(PAGE_SIZE));
+
+      if (filters.category) params.set("category", filters.category);
+      if (filters.tag) params.set("tag", filters.tag);
+      if (filters.remote) params.set("remote", filters.remote);
+      if (filters.search) params.set("search", filters.search);
+      if (filters.deadline) params.set("deadline", filters.deadline);
+
+      const [opportunitiesRes, savedRes, recommendationsRes] = await Promise.allSettled([
+        fetch(`/api/opportunities?${params.toString()}`, { credentials: "include" }),
+        fetch("/api/opportunities/saved/ids", { credentials: "include" }),
+        fetch("/api/recommendations", { credentials: "include" }),
+      ]);
+
+      if (opportunitiesRes.status === "rejected") {
+        throw new Error("Failed to load opportunities");
+      }
+
+      const opportunitiesResponse = opportunitiesRes.value;
+      const opportunitiesData = await safeJson(opportunitiesResponse);
+
+      if (!opportunitiesResponse.ok) {
+        throw new Error(unwrapMessage(opportunitiesData, "Failed to load opportunities"));
+      }
+
+      const nextItems = normaliseOpportunityList(opportunitiesData);
+      setOpportunities(nextItems);
+      setPage(1);
+      setHasMore(
+        Boolean(
+          opportunitiesData.hasMore ??
+            opportunitiesData.has_more ??
+            opportunitiesData.nextPage ??
+            nextItems.length >= PAGE_SIZE,
+        ),
+      );
+
+      const nextSavedIds = [];
+      const nextAuxErrors = [];
+
+      if (savedRes.status === "fulfilled") {
+        const savedResponse = savedRes.value;
+        const savedData = await safeJson(savedResponse);
+        if (savedResponse.ok) {
+          nextSavedIds.push(
+            ...(Array.isArray(savedData)
+              ? savedData
+              : savedData.ids || savedData.savedIds || []),
+          );
+        } else {
+          nextAuxErrors.push(unwrapMessage(savedData, "Failed to load saved opportunities"));
+        }
+      } else {
+        nextAuxErrors.push("Failed to load saved opportunities");
+      }
+
+      if (recommendationsRes.status === "fulfilled") {
+        const recommendationsResponse = recommendationsRes.value;
+        const recommendationsData = await safeJson(recommendationsResponse);
+        if (recommendationsResponse.ok) {
+          setRecommendations(normaliseOpportunityList(recommendationsData));
+        } else {
+          nextAuxErrors.push(unwrapMessage(recommendationsData, "Failed to load recommendations"));
+          setRecommendations([]);
+        }
+      } else {
+        nextAuxErrors.push("Failed to load recommendations");
+        setRecommendations([]);
+      }
+
+      setSavedIds(nextSavedIds);
+      setAuxError(nextAuxErrors.join(" "));
+    } catch (err) {
+      setPageError(err.message || "Failed to load opportunities");
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
 
   useEffect(() => {
-    let alive = true;
-
-    async function loadDiscovery() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const params = new URLSearchParams();
-        params.set("page", "1");
-        params.set("limit", String(PAGE_SIZE));
-
-        if (filters.category) params.set("category", filters.category);
-        if (filters.tag) params.set("tag", filters.tag);
-        if (filters.remote) params.set("remote", filters.remote);
-        if (filters.search) params.set("search", filters.search);
-        if (filters.deadline) params.set("deadline", filters.deadline);
-
-        const [opportunitiesRes, savedRes, recommendationsRes] = await Promise.all([
-          fetch(`/api/opportunities?${params.toString()}`, { credentials: "include" }),
-          fetch("/api/opportunities/saved/ids", { credentials: "include" }),
-          fetch("/api/recommendations", { credentials: "include" }),
-        ]);
-
-        const opportunitiesData = await opportunitiesRes.json().catch(() => ({}));
-        const savedData = await savedRes.json().catch(() => ({}));
-        const recommendationsData = await recommendationsRes.json().catch(() => ({}));
-
-        if (!alive) return;
-
-        if (!opportunitiesRes.ok) {
-          setError(unwrapMessage(opportunitiesData, "Failed to load opportunities"));
-          return;
-        }
-
-        const nextItems = normaliseOpportunityList(opportunitiesData);
-        setOpportunities(nextItems);
-        setPage(1);
-        setHasMore(
-          Boolean(
-            opportunitiesData.hasMore ??
-              opportunitiesData.has_more ??
-              opportunitiesData.nextPage ??
-              nextItems.length >= PAGE_SIZE
-          )
-        );
-
-        setSavedIds(
-          Array.isArray(savedData)
-            ? savedData
-            : savedData.ids || savedData.savedIds || []
-        );
-
-        const recItems = normaliseOpportunityList(recommendationsData);
-        setRecommendations(recItems);
-      } catch {
-        if (alive) setError("Failed to load opportunities");
-      } finally {
-        if (alive) setLoading(false);
-      }
-    }
-
-    loadDiscovery();
-
-    return () => {
-      alive = false;
-    };
-  }, [filters]);
+    queueMicrotask(() => {
+      void loadDiscovery();
+    });
+  }, [loadDiscovery]);
 
   const { categories, tags } = useMemo(() => {
     const categoryMap = new Map();
@@ -149,13 +184,13 @@ function Discovery() {
     const nextSaved = !savedIds.includes(opportunity.id);
     const previous = savedIds;
 
+    setActionError("");
+    setActionMessage("");
     setSavedIds((current) =>
       current.includes(opportunity.id)
         ? current.filter((id) => id !== opportunity.id)
         : [...current, opportunity.id]
     );
-
-    pendingBookmarkRef.current.set(opportunity.id, nextSaved);
     dispatchAnalytics(nextSaved ? "opportunity_saved" : "opportunity_unsaved", {
       opportunityId: opportunity.id,
       title: opportunity.title,
@@ -167,20 +202,22 @@ function Discovery() {
         credentials: "include",
       });
 
+      const data = await safeJson(response);
       if (!response.ok) {
-        throw new Error("bookmark-failed");
+        throw new Error(unwrapMessage(data, "Failed to update saved opportunities"));
       }
+
+      setActionMessage(nextSaved ? "Opportunity saved." : "Opportunity removed from saved.");
     } catch {
       setSavedIds(previous);
-    } finally {
-      pendingBookmarkRef.current.delete(opportunity.id);
+      setActionError("Failed to update saved opportunities");
     }
   };
 
   const loadMore = async () => {
     const nextPage = page + 1;
     setLoadingMore(true);
-    setError("");
+    setLoadMoreError("");
 
     try {
       const params = new URLSearchParams();
@@ -196,10 +233,10 @@ function Discovery() {
       const response = await fetch(`/api/opportunities?${params.toString()}`, {
         credentials: "include",
       });
-      const data = await response.json().catch(() => ({}));
+      const data = await safeJson(response);
 
       if (!response.ok) {
-        setError(unwrapMessage(data, "Failed to load more opportunities"));
+        setLoadMoreError(unwrapMessage(data, "Failed to load more opportunities"));
         return;
       }
 
@@ -210,18 +247,32 @@ function Discovery() {
         Boolean(data.hasMore ?? data.has_more ?? data.nextPage ?? nextItems.length >= PAGE_SIZE)
       );
     } catch {
-      setError("Failed to load more opportunities");
+      setLoadMoreError("Failed to load more opportunities");
     } finally {
       setLoadingMore(false);
     }
   };
 
   if (loading && opportunities.length === 0) {
-    return <p className="opp-page-status">Loading opportunities...</p>;
+    return (
+      <PageState
+        variant="loading"
+        title="Loading opportunities"
+        message="Fetching available opportunities, saved items, and recommendations."
+      />
+    );
   }
 
-  if (error && opportunities.length === 0) {
-    return <p className="opp-page-status error-text">{error}</p>;
+  if (pageError && opportunities.length === 0) {
+    return (
+      <PageState
+        variant="error"
+        title="Discover opportunities"
+        message={pageError}
+        actionLabel="Retry"
+        onAction={loadDiscovery}
+      />
+    );
   }
 
   return (
@@ -234,6 +285,49 @@ function Discovery() {
           category, tag, remote availability, and deadline, then save the ones you want to revisit.
         </p>
       </section>
+
+      {actionError && (
+        <InlineState
+          variant="error"
+          message={actionError}
+          actionLabel="Dismiss"
+          onAction={() => setActionError("")}
+        />
+      )}
+
+      {actionMessage && (
+        <InlineState
+          variant="success"
+          message={actionMessage}
+          actionLabel="Dismiss"
+          onAction={() => setActionMessage("")}
+        />
+      )}
+
+      {loading && opportunities.length > 0 && (
+        <InlineState
+          variant="loading"
+          message="Refreshing opportunities..."
+        />
+      )}
+
+      {pageError && opportunities.length > 0 && (
+        <InlineState
+          variant="error"
+          message={pageError}
+          actionLabel="Retry"
+          onAction={loadDiscovery}
+        />
+      )}
+
+      {auxError && (
+        <InlineState
+          variant="error"
+          message={auxError}
+          actionLabel="Retry"
+          onAction={loadDiscovery}
+        />
+      )}
 
       <OpportunityFilters
         values={filters}
@@ -272,12 +366,23 @@ function Discovery() {
         </section>
       )}
 
-      {error && opportunities.length > 0 && <p className="opp-page-status error-text">{error}</p>}
+      {loadMoreError && (
+        <InlineState
+          variant="error"
+          message={loadMoreError}
+          actionLabel="Retry"
+          onAction={loadMore}
+        />
+      )}
 
       {opportunities.length === 0 ? (
-        <div className="opp-empty">
-          No opportunities match your filters right now.
-        </div>
+        <PageState
+          variant="empty"
+          title="No opportunities match"
+          message="Try adjusting your filters or clear them to see more opportunities."
+          actionLabel="Clear filters"
+          onAction={clearFilters}
+        />
       ) : (
         <div className="opp-list">
           {opportunities.map((opportunity) => {

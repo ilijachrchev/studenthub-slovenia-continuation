@@ -7,6 +7,8 @@ function Sidebar() {
 
     const links = [
         {label: 'Home', path: '/'},
+        {label: "Opportunities", path: '/opportunities'},
+        {label: "My Applications", path: '/my-applications'},
         {label: "Saved", path: '/saved'},
         {label: "My Registrations", path: '/my-registrations'},
         {label: "Settings", path: '/settings'},

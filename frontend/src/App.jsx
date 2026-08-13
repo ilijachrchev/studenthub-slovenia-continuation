@@ -6,6 +6,10 @@ import SetupFeed from "./pages/SetupFeed";
 import ApplicationStatus from "./pages/ApplicationStatus";
 import Home from "./pages/Home";
 import EventDetail from "./pages/EventDetail";
+import Discovery from "./pages/opportunities/Discovery";
+import OpportunityDetail from "./pages/opportunities/OpportunityDetail";
+import MyApplications from "./pages/opportunities/MyApplications";
+import SavedOpportunities from "./pages/opportunities/SavedOpportunities";
 import StudentLayout from "./components/layout/StudentLayout";
 import OrganizerLayout from "./components/layout/OrganizerLayout";
 import OrganizerDashboard from "./pages/organizer/OrganizerDashboard";
@@ -60,6 +64,30 @@ export default function App() {
               <RoleRoute allowedRoles={["organizer"]}>
                 <ApplicationStatus />
               </RoleRoute>
+            } />
+            <Route path="/opportunities" element={
+              <StudentLayout>
+                <Discovery />
+              </StudentLayout>
+            } />
+            <Route path="/opportunities/:id" element={
+              <StudentLayout>
+                <OpportunityDetail />
+              </StudentLayout>
+            } />
+            <Route path="/my-applications" element={
+              <ProtectedRoute>
+                <StudentLayout>
+                  <MyApplications />
+                </StudentLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/saved-opportunities" element={
+              <ProtectedRoute>
+                <StudentLayout>
+                  <SavedOpportunities />
+                </StudentLayout>
+              </ProtectedRoute>
             } />
             <Route path="/events/:id" element={
               <StudentLayout>

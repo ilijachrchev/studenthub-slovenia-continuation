@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import ApplicationStatusBadge from "../../components/opportunities/ApplicationStatusBadge";
 import OpportunityCard from "../../components/opportunities/OpportunityCard";
@@ -10,8 +10,13 @@ import {
   normaliseOpportunityList,
   unwrapMessage,
 } from "../../components/opportunities/opportunitiesUtils";
+import PageState, { InlineState } from "../../components/shared/PageState";
 import { useAuth } from "../../context/AuthContext";
 import "./css/opportunities.css";
+
+async function safeJson(response) {
+  return response.json().catch(() => ({}));
+}
 
 function OpportunityDetail() {
   const { id } = useParams();
@@ -21,60 +26,93 @@ function OpportunityDetail() {
   const [opportunity, setOpportunity] = useState(null);
   const [related, setRelated] = useState([]);
   const [coverNote, setCoverNote] = useState("");
-  const [error, setError] = useState("");
+  const [pageError, setPageError] = useState("");
+  const [relatedError, setRelatedError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
   const [saved, setSaved] = useState(false);
   const [applyState, setApplyState] = useState("");
 
-  useEffect(() => {
-    let alive = true;
+  const loadOpportunity = useCallback(async () => {
+    setLoading(true);
+    setPageError("");
+    setRelatedError("");
+    setActionError("");
+    setActionMessage("");
 
-    async function loadOpportunity() {
-      try {
-        const [detailRes, relatedRes, savedRes] = await Promise.all([
-          fetch(`/api/opportunities/${id}`, { credentials: "include" }),
-          fetch(`/api/opportunities/${id}/related`, { credentials: "include" }),
-          fetch("/api/opportunities/saved/ids", { credentials: "include" }),
-        ]);
+    try {
+      const [detailRes, relatedRes, savedRes] = await Promise.allSettled([
+        fetch(`/api/opportunities/${id}`, { credentials: "include" }),
+        fetch(`/api/opportunities/${id}/related`, { credentials: "include" }),
+        fetch("/api/opportunities/saved/ids", { credentials: "include" }),
+      ]);
 
-        const detailData = await detailRes.json().catch(() => ({}));
-        const relatedData = await relatedRes.json().catch(() => ({}));
-        const savedData = await savedRes.json().catch(() => ({}));
-
-        if (!alive) return;
-
-        if (!detailRes.ok) {
-          setError(unwrapMessage(detailData, "Failed to load opportunity"));
-          return;
-        }
-
-        const item = normaliseOpportunity(detailData.opportunity ?? detailData);
-        setOpportunity(item);
-        setRelated(normaliseOpportunityList(relatedData).slice(0, 3));
-        setSaved(
-          Array.isArray(savedData)
-            ? savedData.some((savedId) => String(savedId) === String(item.id))
-            : (savedData.ids || []).some((savedId) => String(savedId) === String(item.id))
-        );
-        setApplyState(item.applicationStatus || item.application?.status || "");
-        dispatchAnalytics("opportunity_view", {
-          opportunityId: item.id,
-          title: item.title,
-        });
-      } catch {
-        if (alive) setError("Failed to load opportunity");
-      } finally {
-        if (alive) setLoading(false);
+      if (detailRes.status === "rejected") {
+        throw new Error("Failed to load opportunity");
       }
+
+      const detailResponse = detailRes.value;
+      const detailData = await safeJson(detailResponse);
+
+      if (!detailResponse.ok) {
+        throw new Error(unwrapMessage(detailData, "Failed to load opportunity"));
+      }
+
+      const item = normaliseOpportunity(detailData.opportunity ?? detailData);
+      setOpportunity(item);
+      setApplyState(item.applicationStatus || item.application?.status || "");
+      dispatchAnalytics("opportunity_view", {
+        opportunityId: item.id,
+        title: item.title,
+      });
+
+      const secondaryErrors = [];
+
+      if (relatedRes.status === "fulfilled") {
+        const relatedResponse = relatedRes.value;
+        const relatedData = await safeJson(relatedResponse);
+        if (relatedResponse.ok) {
+          setRelated(normaliseOpportunityList(relatedData).slice(0, 3));
+        } else {
+          setRelated([]);
+          secondaryErrors.push(unwrapMessage(relatedData, "Failed to load related opportunities"));
+        }
+      } else {
+        setRelated([]);
+        secondaryErrors.push("Failed to load related opportunities");
+      }
+
+      if (savedRes.status === "fulfilled") {
+        const savedResponse = savedRes.value;
+        const savedData = await safeJson(savedResponse);
+        if (savedResponse.ok) {
+          setSaved(
+            Array.isArray(savedData)
+              ? savedData.some((savedId) => String(savedId) === String(item.id))
+              : (savedData.ids || []).some((savedId) => String(savedId) === String(item.id)),
+          );
+        } else {
+          secondaryErrors.push(unwrapMessage(savedData, "Failed to load saved opportunity state"));
+        }
+      } else {
+        secondaryErrors.push("Failed to load saved opportunity state");
+      }
+
+      setRelatedError(secondaryErrors.join(" "));
+    } catch (err) {
+      setPageError(err.message || "Failed to load opportunity");
+    } finally {
+      setLoading(false);
     }
-
-    loadOpportunity();
-
-    return () => {
-      alive = false;
-    };
   }, [id]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void loadOpportunity();
+    });
+  }, [loadOpportunity]);
 
   const deadlinePassed = useMemo(() => isPastDate(opportunity?.deadline), [opportunity]);
   const alreadyApplied = Boolean(applyState && applyState !== "not_applied");
@@ -82,6 +120,8 @@ function OpportunityDetail() {
   const saveOpportunity = async () => {
     if (!opportunity) return;
     const nextSaved = !saved;
+    setActionError("");
+    setActionMessage("");
     setSaved(nextSaved);
     dispatchAnalytics(nextSaved ? "opportunity_saved" : "opportunity_unsaved", {
       opportunityId: opportunity.id,
@@ -93,19 +133,23 @@ function OpportunityDetail() {
         method: nextSaved ? "POST" : "DELETE",
         credentials: "include",
       });
+      const data = await safeJson(response);
 
       if (!response.ok) {
-        throw new Error("save-failed");
+        throw new Error(unwrapMessage(data, "Failed to update saved opportunity"));
       }
-    } catch {
+
+      setActionMessage(nextSaved ? "Opportunity saved." : "Opportunity removed from saved.");
+    } catch (err) {
       setSaved(!nextSaved);
+      setActionError(err.message || "Failed to update saved opportunity");
     }
   };
 
   const reportOpportunity = opportunity
     ? opportunity.reportUrl ||
       `mailto:studenthub@example.com?subject=${encodeURIComponent(
-        `Report opportunity: ${opportunity.title}`
+        `Report opportunity: ${opportunity.title}`,
       )}`
     : "#";
 
@@ -121,17 +165,18 @@ function OpportunityDetail() {
     }
 
     if (deadlinePassed) {
-      setError("The application deadline has passed.");
+      setActionError("The application deadline has passed.");
       return;
     }
 
     if (alreadyApplied) {
-      setError("You have already applied for this opportunity.");
+      setActionError("You have already applied for this opportunity.");
       return;
     }
 
     setApplying(true);
-    setError("");
+    setActionError("");
+    setActionMessage("");
 
     try {
       const response = await fetch(`/api/opportunities/${opportunity.id}/apply`, {
@@ -140,7 +185,7 @@ function OpportunityDetail() {
         credentials: "include",
         body: JSON.stringify({ cover_note: coverNote, coverNote }),
       });
-      const data = await response.json().catch(() => ({}));
+      const data = await safeJson(response);
 
       if (response.status === 401 || response.status === 403) {
         navigate(`/login?next=${encodeURIComponent(`/opportunities/${opportunity.id}`)}`);
@@ -149,29 +194,50 @@ function OpportunityDetail() {
 
       if (response.status === 409 || data.alreadyApplied) {
         setApplyState("applied");
-        setError("You have already applied for this opportunity.");
+        setActionError("You have already applied for this opportunity.");
         return;
       }
 
       if (!response.ok) {
-        setError(unwrapMessage(data, "Failed to submit application"));
+        setActionError(unwrapMessage(data, "Failed to submit application"));
         return;
       }
 
       setApplyState(data.status || "submitted");
+      setActionMessage("Application submitted.");
       dispatchAnalytics("opportunity_applied", {
         opportunityId: opportunity.id,
         title: opportunity.title,
       });
-    } catch {
-      setError("Failed to submit application");
+    } catch (err) {
+      setActionError(err.message || "Failed to submit application");
     } finally {
       setApplying(false);
     }
   };
 
-  if (loading) return <p className="opp-page-status">Loading opportunity...</p>;
-  if (error && !opportunity) return <p className="opp-page-status error-text">{error}</p>;
+  if (loading) {
+    return (
+      <PageState
+        variant="loading"
+        title="Loading opportunity"
+        message="Fetching the opportunity details and related recommendations."
+      />
+    );
+  }
+
+  if (pageError && !opportunity) {
+    return (
+      <PageState
+        variant="error"
+        title="Opportunity details"
+        message={pageError}
+        actionLabel="Retry"
+        onAction={loadOpportunity}
+      />
+    );
+  }
+
   if (!opportunity) return null;
 
   return (
@@ -207,12 +273,16 @@ function OpportunityDetail() {
             <button type="button" className="opp-secondary-btn" onClick={saveOpportunity}>
               {saved ? "Saved" : "Save"}
             </button>
-            <a className="opp-secondary-btn" href={reportOpportunity} onClick={() => {
-              dispatchAnalytics("opportunity_report_clicked", {
-                opportunityId: opportunity.id,
-                title: opportunity.title,
-              });
-            }}>
+            <a
+              className="opp-secondary-btn"
+              href={reportOpportunity}
+              onClick={() => {
+                dispatchAnalytics("opportunity_report_clicked", {
+                  opportunityId: opportunity.id,
+                  title: opportunity.title,
+                });
+              }}
+            >
               Report
             </a>
           </div>
@@ -225,6 +295,24 @@ function OpportunityDetail() {
             <ApplicationStatusBadge status={opportunity.application.status} />
           )}
         </div>
+
+        {actionError && (
+          <InlineState
+            variant="error"
+            message={actionError}
+            actionLabel="Dismiss"
+            onAction={() => setActionError("")}
+          />
+        )}
+
+        {actionMessage && (
+          <InlineState
+            variant="success"
+            message={actionMessage}
+            actionLabel="Dismiss"
+            onAction={() => setActionMessage("")}
+          />
+        )}
 
         {opportunity.tags.length > 0 && (
           <div className="opp-tags">
@@ -253,8 +341,6 @@ function OpportunityDetail() {
             </a>
           )}
         </div>
-
-        {error && <p className="opp-page-status error-text">{error}</p>}
 
         <section className="opp-detail-section opp-panel">
           <h2>Apply</h2>
@@ -305,6 +391,15 @@ function OpportunityDetail() {
           {opportunity.primary_reason || "This opportunity matches your profile and interests."}
         </p>
       </section>
+
+      {relatedError && (
+        <InlineState
+          variant="error"
+          message={relatedError}
+          actionLabel="Retry"
+          onAction={loadOpportunity}
+        />
+      )}
 
       {related.length > 0 && (
         <section className="opp-panel">

@@ -94,7 +94,9 @@ function OpportunityAnalytics() {
   }, [opportunityId]);
 
   useEffect(() => {
-    void loadAnalytics();
+    queueMicrotask(() => {
+      void loadAnalytics();
+    });
   }, [loadAnalytics]);
 
   const funnelMax = useMemo(() => Math.max(1, ...funnel.map((item) => Number(item.count || item.value || 0))), [funnel]);

@@ -23,6 +23,12 @@ const REQUIRED_TABLES = [
   "bookmark",
   "registration",
   "feedback",
+  "opportunity",
+  "application",
+  "application_history",
+  "notification_preferences",
+  "notification",
+  "opportunity_analytics_event",
 ];
 
 const REQUIRED_INDEXES = [
@@ -34,6 +40,18 @@ const REQUIRED_INDEXES = [
   { table: "registration", index: "idx_registration_event" },
   { table: "event", index: "idx_event_status_start" },
   { table: "event", index: "idx_event_org_status" },
+  { table: "opportunity", index: "idx_opportunity_status" },
+  { table: "opportunity", index: "idx_opportunity_deadline" },
+  { table: "opportunity", index: "idx_opportunity_organization" },
+  { table: "application", index: "idx_application_opportunity" },
+  { table: "application", index: "idx_application_applicant" },
+  { table: "application", index: "idx_application_status" },
+  { table: "application_history", index: "idx_application_history_application" },
+  { table: "notification", index: "idx_notification_recipient_created" },
+  { table: "notification", index: "idx_notification_recipient_read" },
+  { table: "opportunity_analytics_event", index: "idx_opportunity_analytics_event_opportunity_created" },
+  { table: "opportunity_analytics_event", index: "idx_opportunity_analytics_event_opportunity_name" },
+  { table: "opportunity_analytics_event", index: "idx_opportunity_analytics_event_visitor" },
 ];
 
 async function verify() {

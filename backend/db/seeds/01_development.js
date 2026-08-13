@@ -35,6 +35,12 @@ exports.seed = async function (knex) {
     "bookmark",
     "registration",
     "feedback",
+    "opportunity",
+    "application",
+    "application_history",
+    "notification_preferences",
+    "notification",
+    "opportunity_analytics_event",
   ];
 
   const missingTables = [];
@@ -87,6 +93,7 @@ exports.seed = async function (knex) {
     { id: 1, first_name: "Admin", last_name: "User", email: "admin@studenthub.test", password_hash: "$2b$10$7SIIxh22r.4sGjfhTDxufeNN5uT1tYp/YhLxeqvvG08vRCZLMPOQC", role: "admin" },
     { id: 2, first_name: "Organizer", last_name: "User", email: "organizer@studenthub.test", password_hash: "$2b$10$yP0MijK2H34UNQNzZB5Um.NUcoy/yphlLRkSpGzQiZZw/SxD7PHa.", role: "organizer" },
     { id: 3, first_name: "Student", last_name: "User", email: "student@famnit.upr.si", password_hash: "$2b$10$skZUBTrWNACrjlPFCsgjAOGI8ZtCUe5h87CuFTP.SPr5.0v0jdM/S", role: "student" },
+    { id: 4, first_name: "Second", last_name: "Organizer", email: "organizer2@studenthub.test", password_hash: "$2b$10$yP0MijK2H34UNQNzZB5Um.NUcoy/yphlLRkSpGzQiZZw/SxD7PHa.", role: "organizer" },
   ]).onConflict("id").ignore();
 
   // Admin profile
@@ -102,7 +109,201 @@ exports.seed = async function (knex) {
   // Organizer profiles
   await knex("organizer_profile").insert([
     { user_id: 2, organization_id: 1, role_in_org: "owner" },
+    { user_id: 4, organization_id: 3, role_in_org: "owner" },
   ]).onConflict(["user_id", "organization_id"]).ignore();
+
+  // Opportunities
+  await knex("opportunity").insert([
+    {
+      id: 1,
+      organization_id: 1,
+      title: "Open Source Sprint",
+      description: "A hands-on workshop for students who want to contribute to open-source projects.",
+      location: "FAMNIT, Koper",
+      status: "published",
+      deadline: "2026-10-15 17:00:00",
+      created_at: "2026-08-01 09:00:00",
+      published_at: "2026-08-02 09:00:00",
+    },
+    {
+      id: 2,
+      organization_id: 1,
+      title: "Open Source Hack Night",
+      description: "Evening mentoring and project clinic for contributors and newcomers.",
+      location: "Online",
+      status: "published",
+      deadline: "2026-11-01 18:00:00",
+      created_at: "2026-08-03 09:00:00",
+      published_at: "2026-08-04 09:00:00",
+    },
+    {
+      id: 3,
+      organization_id: 1,
+      title: "Documentation Writing Workshop",
+      description: "Learn how to write useful documentation for student projects.",
+      location: "FAMNIT Lab 2, Koper",
+      status: "published",
+      deadline: "2026-12-01 16:00:00",
+      created_at: "2026-08-05 09:00:00",
+      published_at: "2026-08-06 09:00:00",
+    },
+    {
+      id: 4,
+      organization_id: 3,
+      title: "VR Prototype Jam",
+      description: "A fast-paced jam for teams building virtual reality prototypes.",
+      location: "FERI, Maribor",
+      status: "published",
+      deadline: "2026-11-20 12:00:00",
+      created_at: "2026-08-07 09:00:00",
+      published_at: "2026-08-08 09:00:00",
+    },
+    {
+      id: 5,
+      organization_id: 2,
+      title: "AI Research Info Session",
+      description: "A pending event that should stay hidden from discovery.",
+      location: "FAMNIT, Koper",
+      status: "published",
+      deadline: "2026-11-15 17:00:00",
+      created_at: "2026-08-09 09:00:00",
+      published_at: "2026-08-10 09:00:00",
+    },
+    {
+      id: 6,
+      organization_id: 1,
+      title: "Archived Career Talk",
+      description: "A draft opportunity that should never appear publicly.",
+      location: "FAMNIT, Koper",
+      status: "draft",
+      deadline: "2026-12-15 17:00:00",
+      created_at: "2026-08-11 09:00:00",
+      published_at: null,
+    },
+  ]).onConflict("id").ignore();
+
+  // Applications and lifecycle state
+  await knex("application").insert([
+    {
+      id: 1,
+      opportunity_id: 1,
+      applicant_user_id: 3,
+      cover_note: "I have contributed to student open-source projects before.",
+      status: "pending",
+      created_at: "2026-08-10 10:00:00",
+      updated_at: "2026-08-10 10:00:00",
+    },
+  ]).onConflict("id").ignore();
+
+  await knex("application_history").insert([
+    {
+      id: 1,
+      application_id: 1,
+      action: "application_created",
+      from_status: null,
+      to_status: "pending",
+      actor_user_id: 3,
+      created_at: "2026-08-10 10:00:00",
+    },
+  ]).onConflict("id").ignore();
+
+  // Notification preferences and inbox items
+  await knex("notification_preferences").insert([
+    {
+      user_id: 2,
+      preferences: JSON.stringify({
+        application_updates: true,
+        recommendation_updates: true,
+        deadline_reminders: true,
+      }),
+      updated_at: "2026-08-10 10:05:00",
+    },
+    {
+      user_id: 3,
+      preferences: JSON.stringify({
+        application_updates: true,
+        recommendation_updates: true,
+        deadline_reminders: true,
+      }),
+      updated_at: "2026-08-10 10:05:00",
+    },
+  ]).onConflict("user_id").ignore();
+
+  await knex("notification").insert([
+    {
+      id: 1,
+      recipient_user_id: 2,
+      type: "application.received",
+      payload: JSON.stringify({
+        applicationId: 1,
+        opportunityId: 1,
+        applicantUserId: 3,
+        opportunityTitle: "Open Source Sprint",
+      }),
+      is_read: false,
+      created_at: "2026-08-10 10:00:05",
+      read_at: null,
+    },
+    {
+      id: 2,
+      recipient_user_id: 3,
+      type: "application.status_changed",
+      payload: JSON.stringify({
+        applicationId: 1,
+        opportunityId: 1,
+        fromStatus: "pending",
+        toStatus: "under_review",
+        actorUserId: 2,
+        actorRole: "organizer",
+      }),
+      is_read: false,
+      created_at: "2026-08-11 12:00:00",
+      read_at: null,
+    },
+    {
+      id: 3,
+      recipient_user_id: 3,
+      type: "opportunity.deadline_reminder",
+      payload: JSON.stringify({
+        opportunityId: 2,
+        title: "Open Source Hack Night",
+      }),
+      is_read: true,
+      created_at: "2026-08-09 09:00:00",
+      read_at: "2026-08-09 09:05:00",
+    },
+  ]).onConflict("id").ignore();
+
+  // Analytics capture history
+  await knex("opportunity_analytics_event").insert([
+    {
+      id: 1,
+      opportunity_id: 1,
+      event_name: "opportunity_view",
+      actor_user_id: 3,
+      visitor_key: "user:3",
+      metadata: JSON.stringify({ source: "discovery" }),
+      created_at: "2026-08-10 09:55:00",
+    },
+    {
+      id: 2,
+      opportunity_id: 1,
+      event_name: "opportunity_saved",
+      actor_user_id: 3,
+      visitor_key: "user:3",
+      metadata: JSON.stringify({ source: "discovery" }),
+      created_at: "2026-08-10 09:56:00",
+    },
+    {
+      id: 3,
+      opportunity_id: 4,
+      event_name: "opportunity_view",
+      actor_user_id: null,
+      visitor_key: "session:guest-1",
+      metadata: JSON.stringify({ source: "public" }),
+      created_at: "2026-08-11 14:00:00",
+    },
+  ]).onConflict("id").ignore();
 
   // Events
   await knex("event").insert([

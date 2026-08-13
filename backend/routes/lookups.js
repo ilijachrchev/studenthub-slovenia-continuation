@@ -1,6 +1,9 @@
 const express = require('express');
 const pool = require('../db');
 const catchAsync = require('../middleware/catchAsync');
+const analyticsRoutes = require("./analytics");
+const recommendationsRoutes = require("./recommendations");
+const moderationRoutes = require("./moderation");
 
 const router = express.Router();
 
@@ -20,5 +23,9 @@ router.get("/tags", catchAsync(async (req, res) => {
     const { rows } = await pool.query("SELECT id, name FROM tag ORDER BY name");
     res.json(rows);
 }));
+
+router.use("/", analyticsRoutes);
+router.use("/", recommendationsRoutes);
+router.use("/", moderationRoutes);
 
 module.exports = router;

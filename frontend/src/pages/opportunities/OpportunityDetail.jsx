@@ -28,14 +28,15 @@ function OpportunityDetail() {
   const [applyState, setApplyState] = useState("");
 
   useEffect(() => {
+    const controller = new AbortController();
     let alive = true;
 
     async function loadOpportunity() {
       try {
         const [detailData, relatedData, savedData] = await Promise.all([
-          requestJson(`/api/opportunities/${id}`),
-          requestJson(`/api/opportunities/${id}/related`),
-          requestJson("/api/opportunities/saved/ids"),
+          requestJson(`/api/opportunities/${id}`, { signal: controller.signal }),
+          requestJson(`/api/opportunities/${id}/related`, { signal: controller.signal }),
+          requestJson("/api/opportunities/saved/ids", { signal: controller.signal }),
         ]);
 
         if (!alive) return;
@@ -54,9 +55,10 @@ function OpportunityDetail() {
           title: item.title,
         });
       } catch (error) {
+        if (controller.signal.aborted || error?.code === "aborted") return;
         if (alive) setError(getApiErrorMessage(error, "Failed to load opportunity"));
       } finally {
-        if (alive) setLoading(false);
+        if (alive && !controller.signal.aborted) setLoading(false);
       }
     }
 
@@ -64,6 +66,7 @@ function OpportunityDetail() {
 
     return () => {
       alive = false;
+      controller.abort();
     };
   }, [id]);
 

@@ -10,19 +10,23 @@ function SavedOpportunities() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const controller = new AbortController();
     let alive = true;
 
     async function loadSaved() {
       try {
-        const data = await requestJson("/api/opportunities/saved");
+        const data = await requestJson("/api/opportunities/saved", {
+          signal: controller.signal,
+        });
 
         if (!alive) return;
 
         setOpportunities(normaliseOpportunityList(data));
       } catch (error) {
+        if (controller.signal.aborted || error?.code === "aborted") return;
         if (alive) setError(getApiErrorMessage(error, "Failed to load saved opportunities"));
       } finally {
-        if (alive) setLoading(false);
+        if (alive && !controller.signal.aborted) setLoading(false);
       }
     }
 
@@ -30,6 +34,7 @@ function SavedOpportunities() {
 
     return () => {
       alive = false;
+      controller.abort();
     };
   }, []);
 

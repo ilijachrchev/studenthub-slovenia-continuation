@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "jest",
+    "lint": "node scripts/lint.js",
+    "test": "jest --runInBand",
+    "test:coverage": "jest --runInBand --coverage",
     "db:migrate": "knex migrate:latest",
     "db:rollback": "knex migrate:rollback",
     "db:migrate:make": "knex migrate:make",

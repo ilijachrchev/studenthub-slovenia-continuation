@@ -230,6 +230,7 @@
 
   .app-sidebar {
     width: 100%;
+    padding: 18px 16px;
   }
 
   .app-topbar {
@@ -241,11 +242,21 @@
   }
 
   .student-content-grid {
-    display: grid;
-    grid-template-columns: minmax(520px, 1fr) 320px;
-    gap: 24px;
-    padding: 28px;
-    max-width: 1400px;
-    margin: 0 auto;
+    display: block;
+    padding: 16px;
+  }
+
+  .student-main-content {
+    min-width: 0;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .sidebar-link {
+    flex: 1 1 calc(50% - 8px);
+    text-align: center;
   }
 }

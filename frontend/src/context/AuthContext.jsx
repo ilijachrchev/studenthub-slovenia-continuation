@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useState, useEffect, useContext, useCallback } from "react";
+import { requestJson } from "../api/http";
 
 const AuthContext = createContext(null);
 
@@ -9,15 +10,12 @@ export function AuthProvider({ children}) {
 
     const refreshUser = useCallback(async () => {
         try {
-            const response = await fetch ("/api/auth/me", { credentials: "include" });
-            if (response.ok) {
-                const data = await response.json();
-                setUser(data.user);
-            } else {
-                setUser(null);
-            }
+            const data = await requestJson("/api/auth/me");
+            setUser(data.user || null);
+            return data.user || null;
         } catch {
             setUser(null);
+            return null;
         } finally {
             setLoading(false);
         }
@@ -25,7 +23,7 @@ export function AuthProvider({ children}) {
 
     useEffect(() => {
         queueMicrotask(() => {
-            refreshUser();
+            void refreshUser();
         });
     }, [refreshUser]);
 

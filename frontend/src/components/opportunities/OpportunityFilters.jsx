@@ -1,15 +1,14 @@
 import "./css/opportunities.css";
 
-const REMOTE_OPTIONS = [
+const AVAILABILITY_OPTIONS = [
   { value: "", label: "All" },
-  { value: "remote", label: "Remote" },
-  { value: "onsite", label: "On-site" },
+  { value: "open", label: "Open now" },
+  { value: "closed", label: "Closed" },
 ];
 
 function OpportunityFilters({
   values,
-  categories = [],
-  tags = [],
+  organizers = [],
   onChange,
   onClear,
 }) {
@@ -26,38 +25,26 @@ function OpportunityFilters({
             type="search"
             value={values.search}
             onChange={handleChange("search")}
-            placeholder="Search opportunities"
+            placeholder="Search titles, descriptions, or organizers"
           />
         </label>
 
         <label className="opp-field">
-          <span>Category</span>
-          <select value={values.category} onChange={handleChange("category")}>
-            <option value="">All categories</option>
-            {categories.map((category) => (
-              <option key={category.value} value={category.value}>
-                {category.label}
+          <span>Organizer</span>
+          <select value={values.organizer} onChange={handleChange("organizer")}>
+            <option value="">All organizers</option>
+            {organizers.map((organizer) => (
+              <option key={organizer.value} value={organizer.value}>
+                {organizer.label}
               </option>
             ))}
           </select>
         </label>
 
         <label className="opp-field">
-          <span>Tag</span>
-          <select value={values.tag} onChange={handleChange("tag")}>
-            <option value="">All tags</option>
-            {tags.map((tag) => (
-              <option key={tag.value} value={tag.value}>
-                {tag.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="opp-field">
-          <span>Remote</span>
-          <select value={values.remote} onChange={handleChange("remote")}>
-            {REMOTE_OPTIONS.map((option) => (
+          <span>Availability</span>
+          <select value={values.availability} onChange={handleChange("availability")}>
+            {AVAILABILITY_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -66,7 +53,17 @@ function OpportunityFilters({
         </label>
 
         <label className="opp-field">
-          <span>Deadline</span>
+          <span>Location</span>
+          <input
+            type="text"
+            value={values.location}
+            onChange={handleChange("location")}
+            placeholder="Filter by city or venue"
+          />
+        </label>
+
+        <label className="opp-field">
+          <span>Due before</span>
           <input
             type="date"
             value={values.deadline}

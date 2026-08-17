@@ -39,6 +39,37 @@
   margin-top: 12px;
 }
 
+.opp-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.opp-filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opp-filter-pill {
+  border: 1px solid #dbe3ec;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.opp-filter-pill.active {
+  background: #03045e;
+  color: #fff;
+  border-color: #03045e;
+}
+
 .opp-filter-reset {
   border: none;
   background: transparent;
@@ -98,6 +129,11 @@
   color: #075985;
 }
 
+.opp-chip.status {
+  background: #ecfeff;
+  color: #155e75;
+}
+
 .opp-chip.muted {
   background: #eef2ff;
   color: #4338ca;
@@ -120,6 +156,11 @@
 
 .opp-save-btn.saved {
   color: var(--primary);
+}
+
+.opp-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .opp-title {
@@ -177,6 +218,10 @@
   flex-shrink: 0;
 }
 
+.opp-card-status {
+  margin-bottom: 10px;
+}
+
 .app-status-badge {
   display: inline-flex;
   align-items: center;
@@ -222,6 +267,19 @@
   }
 
   .opp-card-head {
+    flex-direction: column;
+  }
+
+  .opp-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .opp-toolbar-actions {
+    justify-content: flex-start;
+  }
+
+  .opp-notifications-head {
     flex-direction: column;
   }
 }

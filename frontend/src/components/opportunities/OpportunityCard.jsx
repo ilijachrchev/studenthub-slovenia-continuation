@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Bookmark, Sparkle } from "../reusable/Icons";
+import ApplicationStatusBadge from "./ApplicationStatusBadge";
 import RecommendationReason from "./RecommendationReason";
 import { formatDate, normaliseOpportunity } from "./opportunitiesUtils";
 import "./css/opportunities.css";
@@ -7,10 +8,12 @@ import "./css/opportunities.css";
 function OpportunityCard({
   opportunity,
   saved = false,
+  saving = false,
   onToggleSave,
   recommendationReason = "",
 }) {
   const item = normaliseOpportunity(opportunity);
+  const applicationStatus = item.applicationStatus || item.application?.status || "";
 
   const handleSaveClick = (event) => {
     if (!onToggleSave) return;
@@ -24,6 +27,7 @@ function OpportunityCard({
       <Link to={`/opportunities/${item.id}`} className="opp-card-link">
         <div className="opp-card-head">
           <div className="opp-chip-row">
+            {item.status && <span className="opp-chip status">{String(item.status).replace(/_/g, " ")}</span>}
             {item.category?.name && <span className="opp-chip">{item.category.name}</span>}
             {item.remote && <span className="opp-chip muted">Remote</span>}
           </div>
@@ -42,6 +46,8 @@ function OpportunityCard({
                 className={`opp-save-btn ${saved ? "saved" : ""}`}
                 onClick={handleSaveClick}
                 aria-label={saved ? "Remove saved opportunity" : "Save opportunity"}
+                aria-pressed={saved}
+                disabled={saving}
               >
                 <Bookmark size={18} filled={saved} />
               </button>
@@ -64,6 +70,12 @@ function OpportunityCard({
           <span>{item.location}</span>
           <span>Deadline: {formatDate(item.deadline)}</span>
         </div>
+
+        {applicationStatus && (
+          <div className="opp-card-status">
+            <ApplicationStatusBadge status={applicationStatus} />
+          </div>
+        )}
 
         {item.tags.length > 0 && (
           <div className="opp-tags">

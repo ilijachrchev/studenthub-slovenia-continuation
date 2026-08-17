@@ -1,13 +1,24 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import PageState from "../shared/PageState";
 
 export default function RoleRoute({ allowedRoles, children }) {
     const { user, loading } = useAuth();
+    const location = useLocation();
 
-    if (loading) return null;
+    if (loading) {
+        return (
+            <PageState
+                variant="loading"
+                title="Checking permissions"
+                message="Verifying your account role before loading this page."
+            />
+        );
+    }
 
     if (!user) {
-        return <Navigate to="/login" replace />;
+        const next = `${location.pathname}${location.search}${location.hash}`;
+        return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />;
     }
 
     if (!allowedRoles.includes(user.role)) {

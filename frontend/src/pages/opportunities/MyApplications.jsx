@@ -1,49 +1,41 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import ApplicationStatusBadge from "../../components/opportunities/ApplicationStatusBadge";
 import {
   formatDateTime,
   normaliseApplication,
   toArray,
-  unwrapMessage,
 } from "../../components/opportunities/opportunitiesUtils";
+import PageState, { InlineState } from "../../components/shared/PageState";
+import { getApiErrorMessage, requestJson } from "../../api/http";
 import "./css/opportunities.css";
 
 function MyApplications() {
+  const navigate = useNavigate();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [pageError, setPageError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+  const [withdrawingIds, setWithdrawingIds] = useState(() => new Set());
 
   useEffect(() => {
-    let alive = true;
+    const controller = new AbortController();
 
     async function loadApplications() {
       try {
-        const response = await fetch("/api/opportunities/applications", {
-          credentials: "include",
-        });
-        const data = await response.json().catch(() => ({}));
-
-        if (!alive) return;
-
-        if (!response.ok) {
-          setError(unwrapMessage(data, "Failed to load your applications"));
-          return;
-        }
-
+        const data = await requestJson("/api/applications/mine", { signal: controller.signal });
         setApplications(toArray(data.applications || data.items || data).map(normaliseApplication));
-      } catch {
-        if (alive) setError("Failed to load your applications");
+      } catch (error) {
+        if (error?.name === "AbortError" || error?.code === "aborted") return;
+        setPageError(getApiErrorMessage(error, "Failed to load your applications"));
       } finally {
-        if (alive) setLoading(false);
+        setLoading(false);
       }
     }
 
-    loadApplications();
-
-    return () => {
-      alive = false;
-    };
+    void loadApplications();
+    return () => controller.abort();
   }, []);
 
   const withdrawApplication = async (application) => {
@@ -51,6 +43,10 @@ function MyApplications() {
       `Withdraw your application for "${application.title}"? This cannot be undone.`
     );
     if (!confirmed) return;
+
+    setActionError("");
+    setActionMessage("");
+    setWithdrawingIds((current) => new Set(current).add(application.id));
 
     const previous = applications;
     setApplications((current) =>
@@ -60,25 +56,48 @@ function MyApplications() {
     );
 
     try {
-      const response = await fetch(`/api/opportunities/${application.opportunityId}/apply`, {
+      const data = await requestJson(`/api/applications/${application.opportunityId}/apply`, {
         method: "DELETE",
-        credentials: "include",
       });
 
-      if (!response.ok) {
-        throw new Error("withdraw-failed");
-      }
-    } catch {
+      setActionMessage(data.message || "Application withdrawn.");
+      await requestJson("/api/applications/mine").then((next) => {
+        setApplications(
+          toArray(next.applications || next.items || next).map(normaliseApplication)
+        );
+      });
+    } catch (error) {
       setApplications(previous);
+      setActionError(getApiErrorMessage(error, "Failed to withdraw your application"));
+    } finally {
+      setWithdrawingIds((current) => {
+        const next = new Set(current);
+        next.delete(application.id);
+        return next;
+      });
     }
   };
 
   if (loading) {
-    return <p className="opp-page-status">Loading your applications...</p>;
+    return (
+      <PageState
+        variant="loading"
+        title="Loading your applications"
+        message="Fetching application history and status updates."
+      />
+    );
   }
 
-  if (error) {
-    return <p className="opp-page-status error-text">{error}</p>;
+  if (pageError) {
+    return (
+      <PageState
+        variant="error"
+        title="My applications"
+        message={pageError}
+        actionLabel="Retry"
+        onAction={() => window.location.reload()}
+      />
+    );
   }
 
   return (
@@ -92,14 +111,45 @@ function MyApplications() {
         </p>
       </section>
 
+      {actionError && (
+        <InlineState
+          variant="error"
+          message={actionError}
+          actionLabel="Dismiss"
+          onAction={() => setActionError("")}
+        />
+      )}
+
+      {actionMessage && (
+        <InlineState
+          variant="success"
+          message={actionMessage}
+          actionLabel="Dismiss"
+          onAction={() => setActionMessage("")}
+        />
+      )}
+
+      <div className="opp-toolbar">
+        <p className="opp-toolbar-meta">
+          {applications.length} {applications.length === 1 ? "application" : "applications"}
+        </p>
+        <Link to="/opportunities" className="opp-link">
+          Browse opportunities
+        </Link>
+      </div>
+
       {applications.length === 0 ? (
-        <div className="opp-empty">
-          You have not applied to any opportunities yet. <Link to="/opportunities">Browse opportunities</Link>
-        </div>
+        <PageState
+          variant="empty"
+          title="No applications yet"
+          message="You have not applied to any opportunities yet."
+          actionLabel="Browse opportunities"
+          onAction={() => navigate("/opportunities")}
+        />
       ) : (
         <div className="opp-list">
           {applications.map((application) => {
-            const canWithdraw = ["pending", "submitted", "under_review", "in_review"].includes(
+            const canWithdraw = ["pending", "submitted", "under_review", "in_review", "shortlisted"].includes(
               String(application.status).toLowerCase()
             );
 
@@ -123,6 +173,13 @@ function MyApplications() {
                   {application.deadline && <span>Deadline: {formatDateTime(application.deadline)}</span>}
                 </div>
 
+                <section className="opp-detail-section">
+                  <h2>Summary</h2>
+                  <p className="opp-detail-desc">
+                    {application.opportunity?.description || "No summary is available for this application."}
+                  </p>
+                </section>
+
                 {application.history.length > 0 && (
                   <section className="opp-detail-section">
                     <h2>History</h2>
@@ -130,8 +187,8 @@ function MyApplications() {
                       {application.history.map((entry, index) => (
                         <li key={`${application.id}-${index}`} className="opp-timeline-item">
                           <div className="opp-timeline-title">
-                            <ApplicationStatusBadge status={entry.status} />
-                            <span>{entry.status || "update"}</span>
+                            <ApplicationStatusBadge status={entry.status || entry.to_status} />
+                            <span>{entry.action || entry.status || "update"}</span>
                             {entry.at && <span>{formatDateTime(entry.at)}</span>}
                           </div>
                           {entry.note && <p className="opp-timeline-note">{entry.note}</p>}
@@ -150,8 +207,9 @@ function MyApplications() {
                       type="button"
                       className="opp-secondary-btn"
                       onClick={() => withdrawApplication(application)}
+                      disabled={withdrawingIds.has(application.id)}
                     >
-                      Withdraw
+                      {withdrawingIds.has(application.id) ? "Withdrawing..." : "Withdraw"}
                     </button>
                   )}
                 </div>

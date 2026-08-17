@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import SetupOrganization from "./pages/SetupOrganization";
@@ -23,6 +23,11 @@ import { AuthProvider } from "./context/AuthContext";
 import MyRegistrations from "./pages/MyRegistrations";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import RoleRoute from "./components/auth/RoleRoute";
+import Discovery from "./pages/opportunities/Discovery";
+import OpportunityDetail from "./pages/opportunities/OpportunityDetail";
+import SavedOpportunities from "./pages/opportunities/SavedOpportunities";
+import MyApplications from "./pages/opportunities/MyApplications";
+import Notifications from "./pages/notifications/Notifications";
 
 
 export default function App() {
@@ -70,6 +75,32 @@ export default function App() {
               </StudentLayout>
             </ProtectedRoute>
           } />
+          <Route path="/opportunities" element={
+            <StudentLayout>
+              <Discovery />
+            </StudentLayout>
+          } />
+          <Route path="/opportunities/saved" element={
+            <ProtectedRoute>
+              <StudentLayout>
+                <SavedOpportunities />
+              </StudentLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/opportunities/applications" element={
+            <ProtectedRoute>
+              <StudentLayout>
+                <MyApplications />
+              </StudentLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/opportunities/:id" element={
+            <StudentLayout>
+              <OpportunityDetail />
+            </StudentLayout>
+          } />
+          <Route path="/saved-opportunities" element={<Navigate to="/opportunities/saved" replace />} />
+          <Route path="/my-applications" element={<Navigate to="/opportunities/applications" replace />} />
           <Route path="/organizer" element={
             <RoleRoute allowedRoles={["organizer"]}>
               <OrganizerLayout>
@@ -109,6 +140,13 @@ export default function App() {
             <ProtectedRoute>
               <StudentLayout>
                 <Saved />
+              </StudentLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/notifications" element={
+            <ProtectedRoute>
+              <StudentLayout>
+                <Notifications />
               </StudentLayout>
             </ProtectedRoute>
           } />

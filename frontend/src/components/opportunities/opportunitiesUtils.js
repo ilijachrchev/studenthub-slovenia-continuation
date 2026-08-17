@@ -94,6 +94,7 @@ export function normaliseOpportunity(opportunity = {}) {
     id: opportunity.id ?? opportunity.opportunity_id,
     title: opportunity.title ?? opportunity.name ?? "Untitled opportunity",
     description: opportunity.description ?? "",
+    status: opportunity.status ?? opportunity.opportunity_status ?? "published",
     category,
     categoryId:
       opportunity.category_id ??
@@ -113,6 +114,7 @@ export function normaliseOpportunity(opportunity = {}) {
       opportunity.apply_by ??
       null,
     startDate: opportunity.start_date ?? opportunity.starts_at ?? opportunity.start_datetime ?? null,
+    publishedAt: opportunity.published_at ?? opportunity.publishedAt ?? null,
     organization,
     organizationName:
       opportunity.organization_name ??
@@ -127,6 +129,11 @@ export function normaliseOpportunity(opportunity = {}) {
       organization?.website ??
       "",
     location: opportunity.location ?? opportunity.place ?? "Online",
+    requirements:
+      opportunity.requirements ??
+      opportunity.requirements_text ??
+      opportunity.requirementsText ??
+      "",
     tags,
     bookmarked: Boolean(
       opportunity.bookmarked ??
@@ -204,7 +211,7 @@ export function normaliseApplication(application = {}) {
       null,
     history: toArray(historySource).map((entry) => ({
       ...entry,
-      status: entry.status ?? entry.state ?? entry.label ?? "",
+      status: entry.status ?? entry.to_status ?? entry.state ?? entry.label ?? "",
       at: entry.at ?? entry.created_at ?? entry.timestamp ?? entry.date ?? null,
       note: entry.note ?? entry.message ?? entry.reason ?? "",
     })),
@@ -212,11 +219,38 @@ export function normaliseApplication(application = {}) {
 }
 
 export function normaliseNotification(notification = {}) {
+  const payload =
+    typeof notification.payload === "object" && notification.payload !== null
+      ? notification.payload
+      : {};
+
+  const derivedCopy = (() => {
+    const opportunityTitle = payload.opportunityTitle || payload.title || "an opportunity";
+
+    switch (notification.type || notification.kind) {
+      case "application.received":
+        return {
+          title: "New application received",
+          body: `${payload.applicantName || "A student"} applied for ${opportunityTitle}.`,
+        };
+      case "application.status_changed":
+        return {
+          title: "Application status updated",
+          body: `${opportunityTitle} changed from ${payload.fromStatus || "a previous status"} to ${payload.toStatus || "an updated status"}.`,
+        };
+      default:
+        return {
+          title: notification.title ?? notification.subject ?? "Notification",
+          body: notification.body ?? notification.message ?? payload.message ?? "",
+        };
+    }
+  })();
+
   return {
     ...notification,
     id: notification.id ?? notification.notification_id,
-    title: notification.title ?? notification.subject ?? "Notification",
-    body: notification.body ?? notification.message ?? "",
+    title: notification.title ?? notification.subject ?? derivedCopy.title,
+    body: notification.body ?? notification.message ?? derivedCopy.body,
     unread: Boolean(notification.unread ?? notification.is_unread ?? notification.read_at == null),
     createdAt:
       notification.created_at ??
@@ -224,6 +258,7 @@ export function normaliseNotification(notification = {}) {
       notification.sent_at ??
       null,
     type: notification.type ?? notification.kind ?? "update",
+    payload,
   };
 }
 

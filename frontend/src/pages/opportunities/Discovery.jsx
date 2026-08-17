@@ -1,144 +1,116 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import PageState, { InlineState } from "../../components/shared/PageState";
 import OpportunityCard from "../../components/opportunities/OpportunityCard";
 import OpportunityFilters from "../../components/opportunities/OpportunityFilters";
-import RecommendationReason from "../../components/opportunities/RecommendationReason";
 import {
   dispatchAnalytics,
   normaliseOpportunityList,
-  unwrapMessage,
 } from "../../components/opportunities/opportunitiesUtils";
+import { getApiErrorMessage, requestJson } from "../../api/http";
+import { useAuth } from "../../context/AuthContext";
 import "./css/opportunities.css";
 
 const PAGE_SIZE = 12;
 
 const INITIAL_FILTERS = {
-  category: "",
-  tag: "",
-  remote: "",
   search: "",
+  organizer: "",
+  availability: "open",
+  location: "",
   deadline: "",
 };
 
 function Discovery() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [opportunities, setOpportunities] = useState([]);
-  const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [savedIds, setSavedIds] = useState([]);
-  const pendingBookmarkRef = useRef(new Map());
+  const [pageError, setPageError] = useState("");
+  const [auxError, setAuxError] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
+  const [pendingBookmarkIds, setPendingBookmarkIds] = useState(() => new Set());
 
-  useEffect(() => {
-    let alive = true;
-
-    async function loadDiscovery() {
+  const loadDiscovery = useCallback(
+    async (nextFilters, signal) => {
       setLoading(true);
-      setError("");
+      setPageError("");
+      setAuxError("");
+      setSaveMessage("");
 
       try {
         const params = new URLSearchParams();
         params.set("page", "1");
         params.set("limit", String(PAGE_SIZE));
 
-        if (filters.category) params.set("category", filters.category);
-        if (filters.tag) params.set("tag", filters.tag);
-        if (filters.remote) params.set("remote", filters.remote);
-        if (filters.search) params.set("search", filters.search);
-        if (filters.deadline) params.set("deadline", filters.deadline);
+        if (nextFilters.search) params.set("search", nextFilters.search);
+        if (nextFilters.organizer) params.set("organizer", nextFilters.organizer);
+        if (nextFilters.availability) params.set("availability", nextFilters.availability);
+        if (nextFilters.location) params.set("location", nextFilters.location);
+        if (nextFilters.deadline) params.set("deadline", nextFilters.deadline);
 
-        const [opportunitiesRes, savedRes, recommendationsRes] = await Promise.all([
-          fetch(`/api/opportunities?${params.toString()}`, { credentials: "include" }),
-          fetch("/api/opportunities/saved/ids", { credentials: "include" }),
-          fetch("/api/recommendations", { credentials: "include" }),
+        const [opportunitiesData, savedData] = await Promise.all([
+          requestJson(`/api/opportunities?${params.toString()}`, {
+            signal,
+          }),
+          requestJson("/api/opportunities/saved/ids", {
+            signal,
+          }).catch((error) => {
+            if (error?.status === 401) return { ids: [] };
+            throw error;
+          }),
         ]);
-
-        const opportunitiesData = await opportunitiesRes.json().catch(() => ({}));
-        const savedData = await savedRes.json().catch(() => ({}));
-        const recommendationsData = await recommendationsRes.json().catch(() => ({}));
-
-        if (!alive) return;
-
-        if (!opportunitiesRes.ok) {
-          setError(unwrapMessage(opportunitiesData, "Failed to load opportunities"));
-          return;
-        }
 
         const nextItems = normaliseOpportunityList(opportunitiesData);
         setOpportunities(nextItems);
         setPage(1);
-        setHasMore(
-          Boolean(
-            opportunitiesData.hasMore ??
-              opportunitiesData.has_more ??
-              opportunitiesData.nextPage ??
-              nextItems.length >= PAGE_SIZE
-          )
-        );
-
+        setHasMore(Boolean(opportunitiesData.hasMore ?? nextItems.length >= PAGE_SIZE));
         setSavedIds(
           Array.isArray(savedData)
             ? savedData
             : savedData.ids || savedData.savedIds || []
         );
-
-        const recItems = normaliseOpportunityList(recommendationsData);
-        setRecommendations(recItems);
-      } catch {
-        if (alive) setError("Failed to load opportunities");
+      } catch (error) {
+        if (error?.name === "AbortError" || error?.code === "aborted") return;
+        setPageError(getApiErrorMessage(error, "Failed to load opportunities"));
       } finally {
-        if (alive) setLoading(false);
+        setLoading(false);
       }
-    }
+    },
+    []
+  );
 
-    loadDiscovery();
+  useEffect(() => {
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      void loadDiscovery(filters, controller.signal);
+    });
+    return () => controller.abort();
+  }, [filters, loadDiscovery]);
 
-    return () => {
-      alive = false;
-    };
-  }, [filters]);
-
-  const { categories, tags } = useMemo(() => {
-    const categoryMap = new Map();
-    const tagMap = new Map();
+  const organizers = useMemo(() => {
+    const map = new Map();
 
     opportunities.forEach((opportunity) => {
-      const category = opportunity.category;
-      if (category?.name) {
-        categoryMap.set(category.name, { value: category.id ?? category.name, label: category.name });
-      }
-
-      opportunity.tags.forEach((tag) => {
-        if (tag?.name) {
-          tagMap.set(tag.name, { value: tag.id ?? tag.name, label: tag.name });
-        }
+      if (!opportunity.organizationId || !opportunity.organizationName) return;
+      map.set(String(opportunity.organizationId), {
+        value: String(opportunity.organizationId),
+        label: opportunity.organizationName,
       });
     });
 
-    return {
-      categories: [...categoryMap.values()].sort((a, b) => a.label.localeCompare(b.label)),
-      tags: [...tagMap.values()].sort((a, b) => a.label.localeCompare(b.label)),
-    };
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
   }, [opportunities]);
 
-  const filteredRecommendations = recommendations.filter((opportunity) => {
-    if (opportunity.category && filters.category) {
-      const value = opportunity.category.id ?? opportunity.category.name;
-      if (String(value) !== String(filters.category)) return false;
-    }
-
-    if (filters.tag && !opportunity.tags.some((tag) => String(tag.id ?? tag.name) === String(filters.tag))) {
-      return false;
-    }
-
-    return true;
-  });
+  const visibleCount = opportunities.length;
 
   const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+    setFilters((current) => ({ ...current, [key]: value }));
   };
 
   const clearFilters = () => {
@@ -146,8 +118,23 @@ function Discovery() {
   };
 
   const toggleBookmark = async (opportunity) => {
+    if (!user) {
+      navigate(`/login?next=${encodeURIComponent(`/opportunities/${opportunity.id}`)}`);
+      return;
+    }
+
+    if (pendingBookmarkIds.has(opportunity.id)) {
+      return;
+    }
+
     const nextSaved = !savedIds.includes(opportunity.id);
     const previous = savedIds;
+    setPendingBookmarkIds((current) => {
+      const next = new Set(current);
+      next.add(opportunity.id);
+      return next;
+    });
+    setSaveMessage("");
 
     setSavedIds((current) =>
       current.includes(opportunity.id)
@@ -155,73 +142,76 @@ function Discovery() {
         : [...current, opportunity.id]
     );
 
-    pendingBookmarkRef.current.set(opportunity.id, nextSaved);
     dispatchAnalytics(nextSaved ? "opportunity_saved" : "opportunity_unsaved", {
       opportunityId: opportunity.id,
       title: opportunity.title,
     });
 
     try {
-      const response = await fetch(`/api/opportunities/${opportunity.id}/bookmark`, {
+      await requestJson(`/api/opportunities/${opportunity.id}/bookmark`, {
         method: nextSaved ? "POST" : "DELETE",
-        credentials: "include",
       });
-
-      if (!response.ok) {
-        throw new Error("bookmark-failed");
-      }
-    } catch {
+      setSaveMessage(nextSaved ? "Opportunity saved." : "Opportunity removed from saved.");
+    } catch (error) {
       setSavedIds(previous);
+      setAuxError(getApiErrorMessage(error, "Failed to update saved opportunities"));
     } finally {
-      pendingBookmarkRef.current.delete(opportunity.id);
+      setPendingBookmarkIds((current) => {
+        const next = new Set(current);
+        next.delete(opportunity.id);
+        return next;
+      });
     }
   };
 
   const loadMore = async () => {
     const nextPage = page + 1;
     setLoadingMore(true);
-    setError("");
+    setAuxError("");
 
     try {
       const params = new URLSearchParams();
       params.set("page", String(nextPage));
       params.set("limit", String(PAGE_SIZE));
 
-      if (filters.category) params.set("category", filters.category);
-      if (filters.tag) params.set("tag", filters.tag);
-      if (filters.remote) params.set("remote", filters.remote);
       if (filters.search) params.set("search", filters.search);
+      if (filters.organizer) params.set("organizer", filters.organizer);
+      if (filters.availability) params.set("availability", filters.availability);
+      if (filters.location) params.set("location", filters.location);
       if (filters.deadline) params.set("deadline", filters.deadline);
 
-      const response = await fetch(`/api/opportunities?${params.toString()}`, {
-        credentials: "include",
-      });
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        setError(unwrapMessage(data, "Failed to load more opportunities"));
-        return;
-      }
-
+      const data = await requestJson(`/api/opportunities?${params.toString()}`);
       const nextItems = normaliseOpportunityList(data);
       setOpportunities((current) => [...current, ...nextItems]);
       setPage(nextPage);
-      setHasMore(
-        Boolean(data.hasMore ?? data.has_more ?? data.nextPage ?? nextItems.length >= PAGE_SIZE)
-      );
-    } catch {
-      setError("Failed to load more opportunities");
+      setHasMore(Boolean(data.hasMore ?? nextItems.length >= PAGE_SIZE));
+    } catch (error) {
+      setAuxError(getApiErrorMessage(error, "Failed to load more opportunities"));
     } finally {
       setLoadingMore(false);
     }
   };
 
   if (loading && opportunities.length === 0) {
-    return <p className="opp-page-status">Loading opportunities...</p>;
+    return (
+      <PageState
+        variant="loading"
+        title="Loading opportunities"
+        message="Fetching the latest opportunities and your saved state."
+      />
+    );
   }
 
-  if (error && opportunities.length === 0) {
-    return <p className="opp-page-status error-text">{error}</p>;
+  if (pageError && opportunities.length === 0) {
+    return (
+      <PageState
+        variant="error"
+        title="Discover opportunities"
+        message={pageError}
+        actionLabel="Retry"
+        onAction={() => loadDiscovery(filters, new AbortController().signal)}
+      />
+    );
   }
 
   return (
@@ -231,69 +221,68 @@ function Discovery() {
         <h1 className="opp-page-title">Discover opportunities</h1>
         <p className="opp-page-subtitle">
           Browse published internships, projects, volunteering, and student jobs. Filter by
-          category, tag, remote availability, and deadline, then save the ones you want to revisit.
+          organizer, location, deadline, and availability, then save the ones you want to revisit.
         </p>
       </section>
 
       <OpportunityFilters
         values={filters}
-        categories={categories}
-        tags={tags}
+        organizers={organizers}
         onChange={handleFilterChange}
         onClear={clearFilters}
       />
 
-      <div className="opp-toolbar">
-        <p className="opp-toolbar-meta">
-          {opportunities.length} {opportunities.length === 1 ? "opportunity" : "opportunities"} visible
-        </p>
-        <Link to="/saved-opportunities" className="opp-link">
-          View saved opportunities
-        </Link>
-      </div>
-
-      {filteredRecommendations.length > 0 && (
-        <section className="opp-panel">
-          <h2>Recommended for you</h2>
-          <div className="opp-list">
-            {filteredRecommendations.slice(0, 3).map((opportunity) => (
-              <OpportunityCard
-                key={`rec-${opportunity.id}`}
-                opportunity={opportunity}
-                saved={savedIds.includes(opportunity.id)}
-                onToggleSave={toggleBookmark}
-                recommendationReason={opportunity.primary_reason || opportunity.reason || ""}
-              />
-            ))}
-          </div>
-          {filteredRecommendations[0]?.primary_reason && (
-            <RecommendationReason reason={filteredRecommendations[0].primary_reason} />
-          )}
-        </section>
+      {saveMessage && (
+        <InlineState
+          variant="success"
+          message={saveMessage}
+          actionLabel="Dismiss"
+          onAction={() => setSaveMessage("")}
+        />
       )}
 
-      {error && opportunities.length > 0 && <p className="opp-page-status error-text">{error}</p>}
+      {auxError && (
+        <InlineState
+          variant="error"
+          message={auxError}
+          actionLabel="Dismiss"
+          onAction={() => setAuxError("")}
+        />
+      )}
+
+      <div className="opp-toolbar">
+        <p className="opp-toolbar-meta">
+          {visibleCount} {visibleCount === 1 ? "opportunity" : "opportunities"} visible
+        </p>
+        <div className="opp-toolbar-actions">
+          <Link to="/opportunities/saved" className="opp-link">
+            Saved opportunities
+          </Link>
+          <Link to="/opportunities/applications" className="opp-link">
+            My applications
+          </Link>
+        </div>
+      </div>
 
       {opportunities.length === 0 ? (
-        <div className="opp-empty">
-          No opportunities match your filters right now.
-        </div>
+        <PageState
+          variant="empty"
+          title="No opportunities found"
+          message="Try adjusting your filters or check back later for new listings."
+          actionLabel="Clear filters"
+          onAction={clearFilters}
+        />
       ) : (
         <div className="opp-list">
-          {opportunities.map((opportunity) => {
-            const recommendation = recommendations.find(
-              (item) => String(item.id) === String(opportunity.id)
-            );
-            return (
-              <OpportunityCard
-                key={opportunity.id}
-                opportunity={opportunity}
-                saved={savedIds.includes(opportunity.id)}
-                onToggleSave={toggleBookmark}
-                recommendationReason={recommendation?.primary_reason || ""}
-              />
-            );
-          })}
+          {opportunities.map((opportunity) => (
+            <OpportunityCard
+              key={opportunity.id}
+              opportunity={opportunity}
+              saved={savedIds.includes(opportunity.id)}
+              saving={pendingBookmarkIds.has(opportunity.id)}
+              onToggleSave={toggleBookmark}
+            />
+          ))}
         </div>
       )}
 

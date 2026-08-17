@@ -101,7 +101,7 @@ function Topbar() {
             <input
                 type="text"
                 className="topbar-search"
-                placeholder="Search events, organizations, or topics..."
+                placeholder="Search events, opportunities, organizations, or topics..."
                 value={term}
                 onChange={handleSearchChange}
                 onKeyDown={handleSearchKeyDown}

@@ -1,65 +1,72 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import OpportunityCard from "../../components/opportunities/OpportunityCard";
-import { normaliseOpportunityList, unwrapMessage } from "../../components/opportunities/opportunitiesUtils";
+import { normaliseOpportunityList } from "../../components/opportunities/opportunitiesUtils";
+import PageState, { InlineState } from "../../components/shared/PageState";
+import { getApiErrorMessage, requestJson } from "../../api/http";
 import "./css/opportunities.css";
 
 function SavedOpportunities() {
   const [opportunities, setOpportunities] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [pageError, setPageError] = useState("");
+  const [actionError, setActionError] = useState("");
 
   useEffect(() => {
-    let alive = true;
+    const controller = new AbortController();
 
     async function loadSaved() {
       try {
-        const response = await fetch("/api/opportunities/saved", {
-          credentials: "include",
-        });
-        const data = await response.json().catch(() => ({}));
-
-        if (!alive) return;
-
-        if (!response.ok) {
-          setError(unwrapMessage(data, "Failed to load saved opportunities"));
-          return;
-        }
-
+        const data = await requestJson("/api/opportunities/saved", { signal: controller.signal });
         setOpportunities(normaliseOpportunityList(data));
-      } catch {
-        if (alive) setError("Failed to load saved opportunities");
+      } catch (error) {
+        if (error?.name === "AbortError" || error?.code === "aborted") return;
+        setPageError(getApiErrorMessage(error, "Failed to load saved opportunities"));
       } finally {
-        if (alive) setLoading(false);
+        setLoading(false);
       }
     }
 
-    loadSaved();
-
-    return () => {
-      alive = false;
-    };
+    void loadSaved();
+    return () => controller.abort();
   }, []);
 
   const handleToggleSave = async (opportunity) => {
     const previous = opportunities;
+    setActionError("");
     setOpportunities((current) => current.filter((item) => item.id !== opportunity.id));
 
     try {
-      const response = await fetch(`/api/opportunities/${opportunity.id}/bookmark`, {
+      await requestJson(`/api/opportunities/${opportunity.id}/bookmark`, {
         method: "DELETE",
-        credentials: "include",
       });
-
-      if (!response.ok) {
-        throw new Error("save-failed");
-      }
-    } catch {
+    } catch (error) {
       setOpportunities(previous);
+      setActionError(getApiErrorMessage(error, "Failed to remove saved opportunity"));
     }
   };
 
-  if (loading) return <p className="opp-page-status">Loading saved opportunities...</p>;
-  if (error) return <p className="opp-page-status error-text">{error}</p>;
+  if (loading) {
+    return (
+      <PageState
+        variant="loading"
+        title="Loading saved opportunities"
+        message="Retrieving the opportunities you bookmarked."
+      />
+    );
+  }
+
+  if (pageError) {
+    return (
+      <PageState
+        variant="error"
+        title="Saved opportunities"
+        message={pageError}
+        actionLabel="Back to discovery"
+        onAction={() => window.location.assign("/opportunities")}
+      />
+    );
+  }
 
   return (
     <div className="opp-page opp-page-shell">
@@ -71,8 +78,32 @@ function SavedOpportunities() {
         </p>
       </section>
 
+      {actionError && (
+        <InlineState
+          variant="error"
+          message={actionError}
+          actionLabel="Dismiss"
+          onAction={() => setActionError("")}
+        />
+      )}
+
+      <div className="opp-toolbar">
+        <p className="opp-toolbar-meta">
+          {opportunities.length} {opportunities.length === 1 ? "saved opportunity" : "saved opportunities"}
+        </p>
+        <Link to="/opportunities" className="opp-link">
+          Browse more
+        </Link>
+      </div>
+
       {opportunities.length === 0 ? (
-        <div className="opp-empty">You have not saved any opportunities yet.</div>
+        <PageState
+          variant="empty"
+          title="Nothing saved yet"
+          message="Bookmark opportunities from discovery or detail pages to keep them here."
+          actionLabel="Browse opportunities"
+          onAction={() => window.location.assign("/opportunities")}
+        />
       ) : (
         <div className="opp-list">
           {opportunities.map((opportunity) => (
@@ -90,4 +121,3 @@ function SavedOpportunities() {
 }
 
 export default SavedOpportunities;
-

@@ -19,6 +19,8 @@ async function resetSequences(knex) {
     { table: '"user"', column: "id" },
     { table: "organization", column: "id" },
     { table: "event", column: "id" },
+    { table: "opportunity", column: "id" },
+    { table: "moderation_report", column: "id" },
   ];
 
   for (const { table, column } of tablesToReset) {

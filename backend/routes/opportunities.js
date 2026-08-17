@@ -1,4 +1,5 @@
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
 const { requireAuth, requireRole } = require("../middleware/auth");
@@ -17,6 +18,20 @@ const {
 } = require("../lib/opportunity/idempotency");
 
 const router = express.Router();
+
+// Mutations are authenticated already, but a compromised/buggy client
+// (or a scripted abuse attempt) shouldn't be able to hammer lifecycle
+// transitions or flood opportunity_history. Keyed by session user, not IP,
+// since these are all auth-gated routes.
+const mutationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
+  keyGenerator: (req) => (req.session && req.session.user ? `user:${req.session.user.id}` : req.ip),
+  message: { error: "Too many requests, please try again later" },
+});
 
 function toIso(value) {
   return value ? new Date(value).toISOString() : null;
@@ -160,7 +175,7 @@ router.get("/:id", catchAsync(async (req, res) => {
 }));
 
 // POST /api/opportunities — organizer creates a new draft
-router.post("/", requireAuth, requireRole("organizer"), catchAsync(async (req, res) => {
+router.post("/", requireAuth, requireRole("organizer"), mutationLimiter, catchAsync(async (req, res) => {
   const errors = validateOpportunity(req.body);
   if (errors.length > 0) {
     return res.status(400).json({ error: errors[0] });
@@ -235,7 +250,7 @@ router.post("/", requireAuth, requireRole("organizer"), catchAsync(async (req, r
 }));
 
 // PATCH /api/opportunities/:id — organizer edits a draft (title/description/location/deadline)
-router.patch("/:id", requireAuth, requireRole("organizer"), catchAsync(async (req, res) => {
+router.patch("/:id", requireAuth, requireRole("organizer"), mutationLimiter, catchAsync(async (req, res) => {
   const id = parseId(req.params.id);
   if (!id) {
     return res.status(404).json({ error: "Opportunity not found" });
@@ -317,7 +332,7 @@ router.patch("/:id", requireAuth, requireRole("organizer"), catchAsync(async (re
 }));
 
 // POST /api/opportunities/:id/transition — explicit, authorization-aware lifecycle transition
-router.post("/:id/transition", requireAuth, catchAsync(async (req, res) => {
+router.post("/:id/transition", requireAuth, mutationLimiter, catchAsync(async (req, res) => {
   const id = parseId(req.params.id);
   if (!id) {
     return res.status(404).json({ error: "Opportunity not found" });

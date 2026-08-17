@@ -45,6 +45,23 @@ function parseBoolean(value) {
   return false;
 }
 
+async function requireAdminRecord(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      "SELECT id FROM admin WHERE user_id = $1",
+      [req.session.user.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(403).json({ error: "Admin record not found for this account" });
+    }
+
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function loadAuditTrail(client, reportId) {
   const { rows } = await client.query(
     `SELECT id, actor_user_id, action, resource_type, resource_id, metadata, created_at
@@ -179,7 +196,7 @@ router.post("/opportunities/:id/report", requireStudent, reportLimiter, catchAsy
   }
 }));
 
-router.get("/admin/moderation/reports", requireAdmin, catchAsync(async (req, res) => {
+router.get("/admin/moderation/reports", requireAdmin, requireAdminRecord, catchAsync(async (req, res) => {
   const status = normalizeStatus(req.query.status || "open");
   const page = parsePage(req.query.page);
   const limit = parseLimit(req.query.limit);
@@ -248,7 +265,7 @@ router.get("/admin/moderation/reports", requireAdmin, catchAsync(async (req, res
   });
 }));
 
-router.get("/admin/moderation/reports/:id", requireAdmin, catchAsync(async (req, res) => {
+router.get("/admin/moderation/reports/:id", requireAdmin, requireAdminRecord, catchAsync(async (req, res) => {
   const reportId = parseId(req.params.id);
   if (!reportId) {
     return res.status(404).json({ error: "Report not found" });
@@ -263,7 +280,7 @@ router.get("/admin/moderation/reports/:id", requireAdmin, catchAsync(async (req,
   res.json({ report: serializeReport(report, auditTrail) });
 }));
 
-router.post("/admin/moderation/reports/:id/review", requireAdmin, catchAsync(async (req, res) => {
+router.post("/admin/moderation/reports/:id/review", requireAdmin, requireAdminRecord, catchAsync(async (req, res) => {
   const reportId = parseId(req.params.id);
   if (!reportId) {
     return res.status(404).json({ error: "Report not found" });
@@ -418,11 +435,11 @@ async function transitionReport(req, res, nextStatus) {
   }
 }
 
-router.post("/admin/moderation/reports/:id/resolve", requireAdmin, catchAsync(async (req, res) => {
+router.post("/admin/moderation/reports/:id/resolve", requireAdmin, requireAdminRecord, catchAsync(async (req, res) => {
   return transitionReport(req, res, "resolved");
 }));
 
-router.post("/admin/moderation/reports/:id/dismiss", requireAdmin, catchAsync(async (req, res) => {
+router.post("/admin/moderation/reports/:id/dismiss", requireAdmin, requireAdminRecord, catchAsync(async (req, res) => {
   return transitionReport(req, res, "dismissed");
 }));
 

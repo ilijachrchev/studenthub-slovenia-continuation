@@ -35,6 +35,8 @@ exports.seed = async function (knex) {
     "bookmark",
     "registration",
     "feedback",
+    "opportunity",
+    "opportunity_tag",
   ];
 
   const missingTables = [];
@@ -104,6 +106,54 @@ exports.seed = async function (knex) {
     { user_id: 2, organization_id: 1, role_in_org: "owner" },
   ]).onConflict(["user_id", "organization_id"]).ignore();
 
+  // Opportunities
+  await knex("opportunity").insert([
+    {
+      id: 1,
+      organization_id: 1,
+      title: "Open Source Sprint",
+      summary: "Hands-on contribution session for students new to open source.",
+      description: "Mentored sprint focused on fixing small issues and reviewing pull requests.",
+      location: "FAMNIT, Koper",
+      status: "published",
+      deadline: "2026-12-15 23:59:00",
+      application_deadline: "2026-12-15 23:59:00",
+      start_date: "2026-12-20 09:00:00",
+      end_date: "2026-12-20 17:00:00",
+      capacity: 25,
+      compensation: null,
+      contact_email: "oss@studenthub.test",
+      apply_url: "https://example.org/open-source-sprint",
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+      published_at: knex.fn.now(),
+      closed_at: null,
+      archived_at: null,
+    },
+    {
+      id: 2,
+      organization_id: 1,
+      title: "Career Prep Clinic",
+      summary: "CV review and interview preparation for students.",
+      description: "Peer-led clinic with short workshops and one-on-one feedback sessions.",
+      location: "FAMNIT, Koper",
+      status: "published",
+      deadline: "2026-12-20 23:59:00",
+      application_deadline: "2026-12-20 23:59:00",
+      start_date: "2026-12-28 10:00:00",
+      end_date: "2026-12-28 13:00:00",
+      capacity: 40,
+      compensation: null,
+      contact_email: "oss@studenthub.test",
+      apply_url: "https://example.org/career-prep",
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+      published_at: knex.fn.now(),
+      closed_at: null,
+      archived_at: null,
+    },
+  ]).onConflict("id").ignore();
+
   // Events
   await knex("event").insert([
     { id: 1, organization_id: 1, title: "Git & GitHub Workshop", description: "Learn version control from scratch. Bring your laptop!", location: "FAMNIT MP2, Koper", start_datetime: "2026-09-15 17:00:00", end_datetime: "2026-09-15 19:00:00", capacity: 30, registration_type: "built_in", external_url: null, status: "published", created_at: knex.fn.now() },
@@ -133,6 +183,12 @@ exports.seed = async function (knex) {
     { event_id: 5, faculty_id: 1 },
     { event_id: 6, faculty_id: 4 },
   ]).onConflict(["event_id", "faculty_id"]).ignore();
+
+  await knex("opportunity_tag").insert([
+    { opportunity_id: 1, tag_id: 1 },
+    { opportunity_id: 1, tag_id: 5 },
+    { opportunity_id: 2, tag_id: 5 },
+  ]).onConflict(["opportunity_id", "tag_id"]).ignore();
 
   // Student profile & interests
   await knex("student_profile").insert([

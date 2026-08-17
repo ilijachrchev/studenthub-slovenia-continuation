@@ -11,11 +11,11 @@
 ## 📋 Status board (read this first)
 
 **Program:** StudentHub Slovenia production evolution · Base branch `dev` @ `fdf81aa`
-**Current wave:** Wave 1 (Foundation) · **Last updated:** _(agent fills)_
+**Current wave:** Integration / release verification · **Last updated:** 2026-08-17
 
 | Agent | Branch | Current WP | Status | Next task | Blocked by |
 |------|--------|-----------|--------|-----------|-----------|
-| 1 Integration Reviewer | — | — | ⬜ idle | review DB merge | Agent 3 |
+| 1 Integration Reviewer | — | — | 🟦 | verify integrated work | local PostgreSQL |
 | 2 Security Reviewer | — | — | ⬜ idle | review DB merge | Agent 3 |
 | 3 DB & Integrity | `feature/ai-db-integrity` | WP-DB-01 | ⬜ | WP-DB-01 | — |
 | 4 Opportunity Lifecycle | `feature/ai-opportunity-lifecycle` | WP-OPP-05 | ⬜ | WP-OPP-05 | DB-01 |
@@ -124,7 +124,16 @@ Queue: `WP-PROD-01` → `WP-PROD-03` → `WP-PROD-02` → `WP-PROD-04`
 > ```
 
 ### Agent 1 — Integration & Architecture Reviewer
-_(no entries yet)_
+### [2026-08-17] Agent 1 — Integration sweep and verification
+- Status: 🟦
+- What changed: removed stale backend route aliases in `backend/app.js`; hardened `frontend/src/lib/api.js` for aborts and mocked JSON responses; propagated abort-aware fetch lifecycles through opportunity, settings, home, search, feedback, and application pages; cleaned merge leftovers in frontend pages/tests; aligned notifications error surfacing with API messages.
+- Commits: `1f4dba8` `fix(backend): remove stale route aliases`; `25eb1ae` `fix(frontend): harden shared api request flow`; `e95ae7a` `fix(frontend): clean merge leftovers and lint issues`.
+- Tests executed: `npm run lint` in `backend`; `npm run lint` in `frontend`; `npm test` in `frontend`; `npm run test:coverage` in `frontend`; `npm run build` in `frontend`; `node -e "require('./app'); console.log('backend app loaded')"` in `backend`; `npm run db:status` in `backend`; `npm test` in `backend`.
+- Test results: backend lint passed; frontend lint passed; frontend unit tests passed (25/25); frontend coverage passed; frontend build passed; backend app module loaded; `db:status` failed because localhost:5433 was unavailable; backend Jest global setup failed with `ECONNREFUSED` because no local PostgreSQL service was reachable.
+- Known failures: backend test/database verification remains blocked by missing local PostgreSQL on ports 5432/5433 and Docker Desktop service is stopped in this session.
+- Decisions: kept the shared `apiRequest` contract tolerant of `Response.json()`-only test doubles; surfaced notification API error messages instead of replacing them with a fixed fallback.
+- Remaining work: rerun backend migration/seed/test suite once a PostgreSQL service is available locally or in CI.
+- Recommended next task: backend verification after database availability is restored.
 
 ### Agent 2 — Security & Quality Reviewer
 _(no entries yet)_

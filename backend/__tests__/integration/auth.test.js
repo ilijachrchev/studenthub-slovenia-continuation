@@ -82,6 +82,33 @@ describe("POST /api/auth/register", () => {
 
     expect(res.status).toBe(400);
   });
+
+  test("rate limits repeated failed registration attempts", async () => {
+    const first = await request(app)
+      .post("/api/auth/register")
+      .send({
+        first_name: "Rate",
+        last_name: "Limit",
+        email: "rate-limit-invalid",
+        password: "short",
+        role: "organizer",
+      });
+
+    expect(first.status).toBe(400);
+
+    const second = await request(app)
+      .post("/api/auth/register")
+      .send({
+        first_name: "Rate",
+        last_name: "Limit",
+        email: "rate-limit-invalid",
+        password: "short",
+        role: "organizer",
+      });
+
+    expect(second.status).toBe(429);
+    expect(second.body.error).toMatch(/too many/i);
+  });
 });
 
 describe("POST /api/auth/login", () => {

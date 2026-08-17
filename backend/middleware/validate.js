@@ -6,6 +6,36 @@ function isString(value) {
     return typeof value === "string";
 }
 
+function parsePositiveInt(value) {
+    if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+        return value;
+    }
+
+    if (!isString(value)) {
+        return null;
+    }
+
+    const parsed = Number.parseInt(value, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function normalizePositiveIntArray(values, name) {
+    if (!Array.isArray(values) || values.length === 0) {
+        return { values: null, error: `${name} must be a non-empty array` };
+    }
+
+    const parsed = [];
+    for (const value of values) {
+        const id = parsePositiveInt(value);
+        if (!id) {
+            return { values: null, error: `${name} must contain only positive integers` };
+        }
+        parsed.push(id);
+    }
+
+    return { values: [...new Set(parsed)], error: null };
+}
+
 function isValidEmail(email) {
     if (!isString(email)) return false;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -81,6 +111,8 @@ function validateFeedback(body) {
 
 module.exports = {
     isValidEmail,
+    parsePositiveInt,
+    normalizePositiveIntArray,
     validateFieldLength,
     validateRegistration,
     validatePasswordChange,

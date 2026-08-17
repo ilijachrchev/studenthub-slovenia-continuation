@@ -4,6 +4,7 @@ const catchAsync = require("../middleware/catchAsync");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { assertTransition, normalizeStatus } = require("../lib/opportunity/statusMachine");
 const { emit } = require("../lib/opportunity/notifications");
+const { parsePositiveInt } = require("../middleware/validate");
 
 const router = express.Router();
 
@@ -12,8 +13,7 @@ function toIso(value) {
 }
 
 function parseId(value) {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : null;
+  return parsePositiveInt(value);
 }
 
 async function getOpportunityOwner(client, opportunityId) {

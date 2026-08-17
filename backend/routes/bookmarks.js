@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
 const { requireAuth } = require("../middleware/auth");
+const { parsePositiveInt } = require("../middleware/validate");
 
 const router = express.Router();
 
@@ -43,29 +44,46 @@ router.get("/ids", catchAsync(async (req, res) => {
 // /api/bookmarks/:id POST method
 router.post("/:id", requireAuth, catchAsync(async (req, res) => {
     const userId = req.session.user.id;
-    const eventId = req.params.id;
-
-    const { rows: existing } = await pool.query(
-        "SELECT id FROM bookmark WHERE user_id = $1 AND event_id = $2",
-        [userId, eventId]
-    );
-    if (existing.length) {
-        return res.status(409).json({ error: "Event already saved" });
+    const eventId = parsePositiveInt(req.params.id);
+    if (!eventId) {
+        return res.status(404).json({ error: "Event not found" });
     }
 
-    await pool.query(
-        "INSERT INTO bookmark (user_id, event_id) VALUES ($1, $2)",
+    const { rows: eventRows } = await pool.query(
+        `SELECT e.id
+         FROM event e
+         JOIN organization o ON o.id = e.organization_id
+         WHERE e.id = $1 AND e.status = 'published' AND o.status = 'approved'`,
+        [eventId]
+    );
+    if (eventRows.length === 0) {
+        return res.status(404).json({ error: "Event not found" });
+    }
+
+    const { rowCount } = await pool.query(
+        `INSERT INTO bookmark (user_id, event_id)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id, event_id) DO NOTHING`,
         [userId, eventId]
     );
+
+    if (rowCount === 0) {
+        return res.status(409).json({ error: "Event already saved" });
+    }
 
     res.status(201).json({message: "Event saved"});
 }));
 
 // /api/bookmarks/:id DELETE method
 router.delete("/:id", requireAuth, catchAsync(async (req, res) => {
+    const eventId = parsePositiveInt(req.params.id);
+    if (!eventId) {
+        return res.status(404).json({error: "No saved event to remove"});
+    }
+
     const { rowCount } = await pool.query(
         "DELETE FROM bookmark WHERE user_id = $1 AND event_id = $2",
-        [req.session.user.id, req.params.id]
+        [req.session.user.id, eventId]
     );
 
     if (rowCount === 0) {

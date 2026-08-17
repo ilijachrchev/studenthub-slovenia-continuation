@@ -3,6 +3,7 @@ const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
 const logger = require("../middleware/logger");
 const { requireRole } = require("../middleware/auth");
+const { normalizePositiveIntArray, parsePositiveInt } = require("../middleware/validate");
 
 const router = express.Router();
 
@@ -13,13 +14,36 @@ router.post("/setup", requireStudent, catchAsync(async (req, res) => {
     const userId = req.session.user.id;
 
     const { faculty_id, study_year, tag_ids } = req.body;
-
-    if (!faculty_id) {
+    const parsedFacultyId = parsePositiveInt(faculty_id);
+    if (!parsedFacultyId) {
         return res.status(400).json({ error: "Faculty is required"});
     }
 
+    const { values: parsedTagIds, error: tagError } = normalizePositiveIntArray(tag_ids || [], "Tag IDs");
+    if (tagError && (!Array.isArray(tag_ids) || tag_ids.length > 0)) {
+        return res.status(400).json({ error: tagError });
+    }
+
+    const { rows: facultyRows } = await pool.query(
+        "SELECT id FROM faculty WHERE id = $1",
+        [parsedFacultyId]
+    );
+    if (facultyRows.length === 0) {
+        return res.status(400).json({ error: "Faculty not found" });
+    }
+
+    if (parsedTagIds && parsedTagIds.length > 0) {
+        const { rows: tagRows } = await pool.query(
+            "SELECT id FROM tag WHERE id = ANY($1::int[])",
+            [parsedTagIds]
+        );
+        if (tagRows.length !== parsedTagIds.length) {
+            return res.status(400).json({ error: "One or more tags are invalid" });
+        }
+    }
+
     const { rows: existing } = await pool.query(
-        "SELECT * FROM student_profile WHERE user_id = $1",
+        "SELECT user_id FROM student_profile WHERE user_id = $1",
         [userId]
     );
     if (existing.length > 0) {
@@ -31,15 +55,22 @@ router.post("/setup", requireStudent, catchAsync(async (req, res) => {
     try {
         await client.query("BEGIN");
 
-        await client.query(
-            "INSERT INTO student_profile (user_id, faculty_id, study_year) VALUES ($1, $2, $3)",
-            [userId, faculty_id, study_year || null]
+        const { rowCount } = await client.query(
+            `INSERT INTO student_profile (user_id, faculty_id, study_year)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (user_id) DO NOTHING`,
+            [userId, parsedFacultyId, study_year || null]
         );
 
-        if (Array.isArray(tag_ids) && tag_ids.length > 0) {
-            for (const tagId of tag_ids) {
+        if (rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({ error: "You have already set up your feed"});
+        }
+
+        if (parsedTagIds && parsedTagIds.length > 0) {
+            for (const tagId of parsedTagIds) {
                 await client.query(
-                    "INSERT INTO user_interest (user_id, tag_id) VALUES ($1, $2)",
+                    "INSERT INTO user_interest (user_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
                     [userId, tagId]
                 );
             }
@@ -88,9 +119,32 @@ router.put("/profile", requireStudent, catchAsync(async (req, res) => {
     const userId = req.session.user.id;
 
     const { faculty_id, study_year, tag_ids} = req.body;
-
-    if (!faculty_id) {
+    const parsedFacultyId = parsePositiveInt(faculty_id);
+    if (!parsedFacultyId) {
         return res.status(400).json({error: "Faculty is required"});
+    }
+
+    const { values: parsedTagIds, error: tagError } = normalizePositiveIntArray(tag_ids || [], "Tag IDs");
+    if (tagError && (!Array.isArray(tag_ids) || tag_ids.length > 0)) {
+        return res.status(400).json({ error: tagError });
+    }
+
+    const { rows: facultyRows } = await pool.query(
+        "SELECT id FROM faculty WHERE id = $1",
+        [parsedFacultyId]
+    );
+    if (facultyRows.length === 0) {
+        return res.status(400).json({ error: "Faculty not found" });
+    }
+
+    if (parsedTagIds && parsedTagIds.length > 0) {
+        const { rows: tagRows } = await pool.query(
+            "SELECT id FROM tag WHERE id = ANY($1::int[])",
+            [parsedTagIds]
+        );
+        if (tagRows.length !== parsedTagIds.length) {
+            return res.status(400).json({ error: "One or more tags are invalid" });
+        }
     }
 
     const client = await pool.connect();
@@ -98,20 +152,25 @@ router.put("/profile", requireStudent, catchAsync(async (req, res) => {
     try {
         await client.query("BEGIN");
 
-        await client.query(
+        const { rowCount } = await client.query(
             "UPDATE student_profile SET faculty_id = $1, study_year = $2 WHERE user_id = $3",
-            [faculty_id, study_year || null, userId]
+            [parsedFacultyId, study_year || null, userId]
         );
+
+        if (rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ error: "Student profile not found" });
+        }
 
         await client.query(
             "DELETE FROM user_interest WHERE user_id = $1",
             [userId]
         );
 
-        if (Array.isArray(tag_ids) && tag_ids.length > 0) {
-            for (const tagId of tag_ids) {
+        if (parsedTagIds && parsedTagIds.length > 0) {
+            for (const tagId of parsedTagIds) {
                 await client.query(
-                    "INSERT INTO user_interest (user_id, tag_id) VALUES ($1, $2)",
+                    "INSERT INTO user_interest (user_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
                     [userId, tagId]
                 );
             }

@@ -72,6 +72,35 @@ function validateEvent(body) {
     return errors;
 }
 
+function validateOpportunity(body, { partial = false } = {}) {
+    const errors = [];
+
+    const e = validateFieldLength(body.title, "Title", 255, !partial || body.title !== undefined);
+    if (e) errors.push(e);
+
+    const e2 = validateFieldLength(body.description, "Description", 5000);
+    if (e2) errors.push(e2);
+
+    const e3 = validateFieldLength(body.location, "Location", 255);
+    if (e3) errors.push(e3);
+
+    const deadlineRequired = !partial || body.deadline !== undefined;
+    if (deadlineRequired) {
+        if (!isNonEmptyString(body.deadline) && !(body.deadline instanceof Date)) {
+            errors.push("Deadline is required");
+        } else {
+            const deadline = new Date(body.deadline);
+            if (Number.isNaN(deadline.getTime())) {
+                errors.push("Deadline must be a valid date");
+            } else if (deadline.getTime() <= Date.now()) {
+                errors.push("Deadline must be in the future");
+            }
+        }
+    }
+
+    return errors;
+}
+
 function validateFeedback(body) {
     const errors = [];
     const e = validateFieldLength(body.comment, "Comment", 2000);
@@ -86,5 +115,6 @@ module.exports = {
     validatePasswordChange,
     validateOrganization,
     validateEvent,
+    validateOpportunity,
     validateFeedback,
 };

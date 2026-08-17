@@ -23,6 +23,9 @@ const REQUIRED_TABLES = [
   "bookmark",
   "registration",
   "feedback",
+  "moderator",
+  "moderation_report",
+  "moderation_audit_log",
 ];
 
 const REQUIRED_INDEXES = [

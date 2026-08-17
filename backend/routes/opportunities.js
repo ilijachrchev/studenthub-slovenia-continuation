@@ -344,6 +344,8 @@ router.get("/saved", requireAuth, catchAsync(async (req, res) => {
   res.json({ opportunities, items: opportunities });
 }));
 
+router.use("/", applicationRoutes);
+
 router.get("/:id", catchAsync(async (req, res) => {
   const opportunityId = parseId(req.params.id);
   if (!opportunityId) {
@@ -415,7 +417,4 @@ router.delete("/:id/bookmark", requireAuth, catchAsync(async (req, res) => {
 
   res.json({ message: "Opportunity removed from saved" });
 }));
-
-router.use("/", applicationRoutes);
-
 module.exports = router;

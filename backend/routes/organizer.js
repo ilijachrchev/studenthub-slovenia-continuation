@@ -604,13 +604,13 @@ async function runOpportunityLifecycleAction(req, res, nextStatus, fieldName) {
 
     const { rowCount } = await client.query(
       `UPDATE opportunity
-       SET status = $1,
-           published_at = CASE WHEN $1 IN ('submitted', 'published') AND published_at IS NULL THEN NOW() ELSE published_at END,
-           closed_at = CASE WHEN $1 = 'closed' THEN NOW() ELSE closed_at END,
-           archived_at = CASE WHEN $1 = 'archived' THEN NOW() ELSE archived_at END,
+       SET status = $1::character varying(50),
+           published_at = CASE WHEN $1::character varying(50) IN ('submitted', 'published') AND published_at IS NULL THEN NOW() ELSE published_at END,
+           closed_at = CASE WHEN $1::character varying(50) = 'closed' THEN NOW() ELSE closed_at END,
+           archived_at = CASE WHEN $1::character varying(50) = 'archived' THEN NOW() ELSE archived_at END,
            updated_at = NOW()
        WHERE id = $2
-         AND status = $3`,
+         AND status = $3::character varying(50)`,
       [nextStatus, opportunityId, current.status]
     );
 

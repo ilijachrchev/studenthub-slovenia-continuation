@@ -16,14 +16,19 @@ function SearchResults() {
         return;
     }
 
+    const controller = new AbortController();
+
     async function search() {
         setLoading(true);
         setError("");
 
         try {
-            const data = await apiRequest(`/api/search?q=${encodeURIComponent(query)}`);
+            const data = await apiRequest(`/api/search?q=${encodeURIComponent(query)}`, {
+              signal: controller.signal,
+            });
             setEvents(data.events || []);
-        } catch {
+        } catch (error) {
+            if (error?.code === "aborted") return;
             setError("Search failed");
         } finally {
             setLoading(false);
@@ -31,6 +36,10 @@ function SearchResults() {
     }
 
     search();
+
+    return () => {
+      controller.abort();
+    };
   }, [query]);
 
 

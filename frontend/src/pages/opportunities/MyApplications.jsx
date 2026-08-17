@@ -15,14 +15,16 @@ function MyApplications() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const controller = new AbortController();
     let alive = true;
 
     async function loadApplications() {
       try {
-        const data = await apiRequest("/api/opportunities/applications");
+        const data = await apiRequest("/api/opportunities/applications", { signal: controller.signal });
         if (!alive) return;
         setApplications(toArray(data.applications || data.items || data).map(normaliseApplication));
-      } catch {
+      } catch (error) {
+        if (error?.code === "aborted") return;
         if (alive) setError("Failed to load your applications");
       } finally {
         if (alive) setLoading(false);
@@ -33,6 +35,7 @@ function MyApplications() {
 
     return () => {
       alive = false;
+      controller.abort();
     };
   }, []);
 

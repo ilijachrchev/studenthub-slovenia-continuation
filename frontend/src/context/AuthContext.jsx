@@ -58,7 +58,11 @@ export function AuthProvider({ children}) {
     }, []);
 
     useEffect(() => {
-        void refreshUser();
+        const timer = setTimeout(() => {
+            void refreshUser();
+        }, 0);
+
+        return () => clearTimeout(timer);
     }, [refreshUser]);
 
 

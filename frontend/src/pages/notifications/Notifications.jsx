@@ -6,7 +6,7 @@ import {
 } from "../../components/opportunities/opportunitiesUtils";
 import ApplicationStatusBadge from "../../components/opportunities/ApplicationStatusBadge";
 import "./../opportunities/css/opportunities.css";
-import { apiRequest } from "../../lib/api";
+import { apiRequest, getApiErrorMessage } from "../../lib/api";
 
 const DEFAULT_PREFERENCES = {
   application_updates: true,
@@ -37,8 +37,8 @@ function Notifications() {
           ...current,
           ...(prefsRes.preferences || prefsRes),
         }));
-      } catch {
-        if (alive) setError("Failed to load notifications");
+      } catch (error) {
+        if (alive) setError(getApiErrorMessage(error, "Failed to load notifications"));
       } finally {
         if (alive) setLoading(false);
       }

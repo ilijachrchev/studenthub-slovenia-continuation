@@ -1,5 +1,8 @@
 export class ApiError extends Error {
-  constructor(message, { status = 0, data = null, response = null, url = "", method = "GET" } = {}) {
+  constructor(
+    message,
+    { status = 0, data = null, response = null, url = "", method = "GET", code = "" } = {}
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
@@ -7,6 +10,7 @@ export class ApiError extends Error {
     this.response = response;
     this.url = url;
     this.method = method;
+    this.code = code;
   }
 }
 
@@ -27,6 +31,14 @@ function isPlainObject(value) {
 async function readResponseBody(response) {
   if (response.status === 204) {
     return null;
+  }
+
+  if (typeof response.text !== "function" && typeof response.json === "function") {
+    try {
+      return await response.json();
+    } catch {
+      return null;
+    }
   }
 
   const text = await response.text();
@@ -98,6 +110,14 @@ export async function apiRequest(input, options = {}) {
   try {
     response = await fetch(input, buildInit(options));
   } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new ApiError("Request was aborted", {
+        code: "aborted",
+        url: String(input),
+        method: options.method || "GET",
+      });
+    }
+
     throw new ApiError(error?.message || "Network request failed", {
       url: String(input),
       method: options.method || "GET",
@@ -113,6 +133,7 @@ export async function apiRequest(input, options = {}) {
       response,
       url: String(input),
       method: options.method || "GET",
+      code: "http_error",
     });
   }
 

@@ -5,7 +5,7 @@ import EventList from "../components/home/EventList";
 import HomeHero from "../components/home/HomeHero";
 import HomeFilters from "../components/home/HomeFilters";
 import "./css/Home.css";
-import { apiRequest, getApiErrorMessage } from "../lib/api";
+import { apiRequest } from "../lib/api";
 
 function Home() {
   const {user} = useAuth();
@@ -21,12 +21,14 @@ function Home() {
   const [savedIds, setSavedIds] = useState([]);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     async function loadEvents() {
       try {
         const [eventsData, tagsData, savedData] = await Promise.all([
-          apiRequest("/api/events?page=1&limit=20"),
-          apiRequest("/api/tags"),
-          apiRequest("/api/bookmarks/ids"),
+          apiRequest("/api/events?page=1&limit=20", { signal: controller.signal }),
+          apiRequest("/api/tags", { signal: controller.signal }),
+          apiRequest("/api/bookmarks/ids", { signal: controller.signal }),
         ]);
 
         setEvents(eventsData.events || []);
@@ -34,7 +36,8 @@ function Home() {
         setPage(1);
         setTags(Array.isArray(tagsData) ? tagsData : []);
         setSavedIds(savedData.ids || []);
-      } catch {
+      } catch (error) {
+        if (error?.code === "aborted") return;
         setError("Failed to load events");
       } finally {
         setLoading(false);
@@ -42,6 +45,10 @@ function Home() {
     }
 
     loadEvents();
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
   const loadMore = async () => {
@@ -66,7 +73,7 @@ function Home() {
     );
 
     try {
-      const res = await apiRequest(`/api/bookmarks/${eventId}`, {
+      await apiRequest(`/api/bookmarks/${eventId}`, {
         method: isSaved ? "DELETE" : "POST",
       });
     } catch {

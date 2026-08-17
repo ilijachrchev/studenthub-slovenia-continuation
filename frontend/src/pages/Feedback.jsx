@@ -18,21 +18,28 @@ function Feedback() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     async function load() {
         try {
             const [eventRes, feedbackRes] = await Promise.all([
-                apiRequest(`/api/events/${eventId}`),
-                apiRequest(`/api/feedback/${eventId}`),
+                apiRequest(`/api/events/${eventId}`, { signal: controller.signal }),
+                apiRequest(`/api/feedback/${eventId}`, { signal: controller.signal }),
             ]);
             setEvent(eventRes);
             if (feedbackRes.feedback) setExisting(feedbackRes.feedback);
-        } catch {
+        } catch (error) {
+            if (error?.code === "aborted") return;
             setError("Failed to load this event");
         } finally {
             setLoading(false);
         }
     }
     load();
+
+    return () => {
+        controller.abort();
+    };
   }, [eventId]);
 
   const handleSubmit= async () => {

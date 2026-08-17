@@ -33,6 +33,7 @@ function Discovery() {
   const pendingBookmarkRef = useRef(new Map());
 
   useEffect(() => {
+    const controller = new AbortController();
     let alive = true;
 
     async function loadDiscovery() {
@@ -51,9 +52,9 @@ function Discovery() {
         if (filters.deadline) params.set("deadline", filters.deadline);
 
         const [opportunitiesRes, savedRes, recommendationsRes] = await Promise.all([
-          apiRequest(`/api/opportunities?${params.toString()}`),
-          apiRequest("/api/opportunities/saved/ids"),
-          apiRequest("/api/recommendations"),
+          apiRequest(`/api/opportunities?${params.toString()}`, { signal: controller.signal }),
+          apiRequest("/api/opportunities/saved/ids", { signal: controller.signal }),
+          apiRequest("/api/recommendations", { signal: controller.signal }),
         ]);
 
         if (!alive) return;
@@ -78,7 +79,8 @@ function Discovery() {
 
         const recItems = normaliseOpportunityList(recommendationsRes);
         setRecommendations(recItems);
-      } catch {
+      } catch (error) {
+        if (error?.code === "aborted") return;
         if (alive) setError("Failed to load opportunities");
       } finally {
         if (alive) setLoading(false);
@@ -89,6 +91,7 @@ function Discovery() {
 
     return () => {
       alive = false;
+      controller.abort();
     };
   }, [filters]);
 
@@ -153,7 +156,7 @@ function Discovery() {
     });
 
     try {
-      const response = await apiRequest(`/api/opportunities/${opportunity.id}/bookmark`, {
+      await apiRequest(`/api/opportunities/${opportunity.id}/bookmark`, {
         method: nextSaved ? "POST" : "DELETE",
       });
     } catch {

@@ -317,6 +317,11 @@ router.delete("/:id/apply", requireAuth, requireRole("student"), catchAsync(asyn
 
     const application = rows[0];
     const ownerUserId = await getOpportunityOwnerUserId(client, opportunityId);
+    if (application.status === "withdrawn") {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Application not found" });
+    }
+
     let transition;
     try {
       transition = assertTransition(application.status, "withdrawn", "student");

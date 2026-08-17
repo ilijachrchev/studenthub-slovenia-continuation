@@ -2,19 +2,19 @@ import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
 import { apiRequest, ApiError, isApiError, getApiErrorMessage } from "../lib/api";
 
 describe("apiRequest", () => {
-  const originalFetch = global.fetch;
+  const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
-    global.fetch = vi.fn();
+    globalThis.fetch = vi.fn();
   });
 
   afterEach(() => {
-    global.fetch = originalFetch;
+    globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
 
   test("defaults to include credentials and parses JSON responses", async () => {
-    global.fetch.mockResolvedValue({
+    globalThis.fetch.mockResolvedValue({
       ok: true,
       status: 200,
       headers: { get: () => "application/json" },
@@ -22,11 +22,11 @@ describe("apiRequest", () => {
     });
 
     await expect(apiRequest("/api/test")).resolves.toEqual({ ok: true });
-    expect(global.fetch).toHaveBeenCalledWith("/api/test", expect.objectContaining({ credentials: "include" }));
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/test", expect.objectContaining({ credentials: "include" }));
   });
 
   test("normalizes API errors with status and response data", async () => {
-    global.fetch.mockResolvedValue({
+    globalThis.fetch.mockResolvedValue({
       ok: false,
       status: 403,
       headers: { get: () => "application/json" },
@@ -42,7 +42,7 @@ describe("apiRequest", () => {
   });
 
   test("handles empty successful responses", async () => {
-    global.fetch.mockResolvedValue({
+    globalThis.fetch.mockResolvedValue({
       ok: true,
       status: 204,
       headers: { get: () => null },
@@ -53,7 +53,7 @@ describe("apiRequest", () => {
   });
 
   test("serializes plain-object request bodies as JSON", async () => {
-    global.fetch.mockResolvedValue({
+    globalThis.fetch.mockResolvedValue({
       ok: true,
       status: 200,
       headers: { get: () => "application/json" },
@@ -62,7 +62,7 @@ describe("apiRequest", () => {
 
     await apiRequest("/api/test", { method: "POST", body: { hello: "world" } });
 
-    const [, init] = global.fetch.mock.calls[0];
+    const [, init] = globalThis.fetch.mock.calls[0];
     expect(init.headers["Content-Type"]).toBe("application/json");
     expect(init.body).toBe(JSON.stringify({ hello: "world" }));
   });

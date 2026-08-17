@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { GraduationCap } from "../components/reusable/Icons";
 import "./css/SetupFeed.css";
 import { useAuth } from "../context/AuthContext";
-import { apiRequest, getApiErrorMessage } from "../lib/api";
+import { apiRequest } from "../lib/api";
 
 
 function SetupFeed() {
@@ -63,11 +63,12 @@ function SetupFeed() {
 
       await refreshUser();
       navigate("/");
-    } catch (error) {
-        setError('Failed to save preferences');
-        setLoading(false);
-      }
-    };
+    } catch {
+      setError('Failed to save preferences');
+    } finally {
+      setLoading(false);
+    }
+  };
 
     return (
     <div className="login-page">

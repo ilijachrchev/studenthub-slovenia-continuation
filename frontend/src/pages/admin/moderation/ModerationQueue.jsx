@@ -6,10 +6,6 @@ import StatusBadge from "../../../components/shared/StatusBadge";
 import "./ModerationQueue.css";
 import { apiRequest } from "../../../lib/api";
 
-function safeJson(res) {
-  return res.json().catch(() => ({}));
-}
-
 function normalizeReport(report) {
   return {
     ...report,

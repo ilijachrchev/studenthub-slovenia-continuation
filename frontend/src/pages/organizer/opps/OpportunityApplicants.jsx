@@ -6,10 +6,6 @@ import StatusBadge from "../../../components/shared/StatusBadge";
 import "./OpportunityApplicants.css";
 import { apiRequest } from "../../../lib/api";
 
-function safeJson(res) {
-  return res.json().catch(() => ({}));
-}
-
 function normalizeOpportunity(opportunity) {
   return opportunity ? opportunity : null;
 }

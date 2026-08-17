@@ -5,10 +5,6 @@ import StatusBadge from "../../../components/shared/StatusBadge";
 import "./OpportunityAnalytics.css";
 import { apiRequest } from "../../../lib/api";
 
-function safeJson(res) {
-  return res.json().catch(() => ({}));
-}
-
 function pickSeries(data) {
   return data.timeseries || data.timeline || data.series || [];
 }

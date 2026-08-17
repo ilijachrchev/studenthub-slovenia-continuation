@@ -3,7 +3,7 @@ import { useState } from "react";
 import { GraduationCap } from "../components/reusable/Icons";
 import { useAuth } from "../context/AuthContext";
 import "./css/SetupFeed.css";
-import { apiRequest, getApiErrorMessage } from "../lib/api";
+import { apiRequest } from "../lib/api";
 
 
 function SetupOrganization() {
@@ -38,8 +38,9 @@ function SetupOrganization() {
       });
 
       navigate("/application-status");
-    } catch (error) {
+    } catch {
       setError("Failed to submit application");
+    } finally {
       setLoading(false);
     }
   };

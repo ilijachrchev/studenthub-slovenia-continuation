@@ -9,10 +9,6 @@ import { apiRequest } from "../../../lib/api";
 
 const EMPTY_OPPORTUNITY = null;
 
-function safeJson(res) {
-  return res.json().catch(() => ({}));
-}
-
 function normalizeOpportunity(opportunity) {
   return {
     ...opportunity,

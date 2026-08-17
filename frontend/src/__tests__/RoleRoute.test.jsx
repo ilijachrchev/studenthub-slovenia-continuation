@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { describe, test, expect, vi } from "vitest";
 import RoleRoute from "../components/auth/RoleRoute";
 
@@ -10,7 +10,20 @@ vi.mock("../context/AuthContext", () => ({
 import { useAuth } from "../context/AuthContext";
 
 function renderWithRouter(ui) {
-  return render(<MemoryRouter>{ui}</MemoryRouter>);
+  return render(
+    <MemoryRouter initialEntries={["/organizer"]}>
+      <Routes>
+        <Route path="/organizer" element={ui} />
+        <Route path="/login" element={<LocationProbe />} />
+        <Route path="/" element={<LocationProbe />} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
 describe("RoleRoute", () => {
@@ -36,6 +49,7 @@ describe("RoleRoute", () => {
     );
 
     expect(screen.queryByText("Organizer Content")).not.toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/");
   });
 
   test("redirects to /login when user is null", () => {
@@ -48,17 +62,20 @@ describe("RoleRoute", () => {
     );
 
     expect(screen.queryByText("Admin Content")).not.toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/login?next=%2Forganizer"
+    );
   });
 
   test("renders nothing while loading", () => {
     useAuth.mockReturnValue({ user: null, loading: true });
 
-    const { container } = renderWithRouter(
+    renderWithRouter(
       <RoleRoute allowedRoles={["admin"]}>
         <div>Admin Content</div>
       </RoleRoute>
     );
 
-    expect(container.innerHTML).toBe("");
+    expect(screen.getByRole("status")).toHaveTextContent("Checking permissions");
   });
 });

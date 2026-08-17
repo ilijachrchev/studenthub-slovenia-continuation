@@ -13,6 +13,13 @@ const STATUS_LABELS = {
   dismissed: "Dismissed",
   published: "Published",
   cancelled: "Cancelled",
+  under_review: "Under review",
+  escalated: "Escalated",
+  hidden: "Hidden",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  critical: "Critical",
 };
 
 function normalizeStatus(value) {

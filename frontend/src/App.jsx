@@ -13,6 +13,7 @@ import CreateEvent from "./pages/organizer/CreateEvent";
 import AdminLayout from "./components/layout/AdminLayout";
 import PendingEvents from "./pages/admin/PendingEvents";
 import PendingOrganizations from "./pages/admin/PendingOrganizations";
+import ModerationQueue from "./pages/admin/moderation/ModerationQueue";
 import AccountSettings from "./pages/AccountSettings";
 import Saved from "./pages/Saved";
 import Feedback from "./pages/Feedback";
@@ -96,6 +97,11 @@ export default function App() {
               <AdminLayout>
                 <PendingOrganizations />
               </AdminLayout>
+            </RoleRoute>
+          } />
+          <Route path="/admin/moderation" element={
+            <RoleRoute allowedRoles={["admin", "moderator"]}>
+              <ModerationQueue />
             </RoleRoute>
           } />
           <Route path="/settings" element={

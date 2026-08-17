@@ -15,12 +15,15 @@ function ReportCard({ report, active, onOpen }) {
   return (
     <button type="button" className={active ? "report-card active" : "report-card"} onClick={() => onOpen(report)}>
       <div className="report-card-top">
-        <h3>{report.subject || report.title || `Report #${report.id}`}</h3>
+        <h3>{report.opportunity_title || `Report #${report.id}`}</h3>
         <StatusBadge status={report.status} />
       </div>
-      <p className="report-card-summary">{report.reason || report.summary || "No summary provided."}</p>
+      <p className="report-card-summary">
+        {report.organization_name || "Unknown organization"} &middot; {report.category || "other"}
+      </p>
       <div className="report-card-meta">
-        <span>{report.reporter_name || report.reporter_email || "Anonymous reporter"}</span>
+        <StatusBadge status={report.severity} className="severity-badge" />
+        <span>{report.assigned_moderator_email || "Unassigned"}</span>
         <span>{formatDateTime(report.created_at)}</span>
       </div>
     </button>

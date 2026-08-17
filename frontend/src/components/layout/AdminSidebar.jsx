@@ -1,14 +1,16 @@
 import { Link, useLocation } from "react-router-dom";
 import logo from "../../assets/logo.png";
+import { useAuth } from "../../context/AuthContext";
 
 function AdminSidebar() {
     const location = useLocation();
+    const { user } = useAuth();
 
     const links = [
-        { label: "Pending Events", path: "/admin" },
-        { label: "Organizations", path: "/admin/organizations" },
-        { label: "Moderation", path: "/admin/moderation" },
-    ];
+        { label: "Pending Events", path: "/admin", roles: ["admin"] },
+        { label: "Organizations", path: "/admin/organizations", roles: ["admin"] },
+        { label: "Moderation", path: "/admin/moderation", roles: ["admin", "moderator"] },
+    ].filter((link) => link.roles.includes(user?.role));
 
     return (
         <div className="app-sidebar">

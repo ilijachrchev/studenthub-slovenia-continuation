@@ -3,6 +3,7 @@ const pool = require("../db");
 const catchAsync = require("../middleware/catchAsync");
 const { requireAuth } = require("../middleware/auth");
 const { emit } = require("../lib/opportunity/notifications");
+const { recordEvent } = require("../lib/opportunity/analytics");
 const {
   getOpportunityOwnerUserId,
   getOpportunityTags,
@@ -356,6 +357,11 @@ router.get("/:id", catchAsync(async (req, res) => {
   if (!opportunity) {
     return res.status(404).json({ error: "Opportunity not found" });
   }
+
+  await recordEvent("opportunity_view", {
+    opportunityId,
+    userId: req.session.user?.id || null,
+  });
 
   res.json({ opportunity });
 }));

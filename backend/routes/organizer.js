@@ -783,12 +783,19 @@ router.get("/opportunities/:id/analytics", requireOrganizer, catchAsync(async (r
     [opportunityId]
   );
 
+  const { rows: viewRows } = await pool.query(
+    `SELECT COUNT(*)::int AS count
+     FROM opportunity_event
+     WHERE opportunity_id = $1 AND event_type = 'opportunity_view'`,
+    [opportunityId]
+  );
+
   const applications = applicationRows.length;
   const reviews = applicationRows.filter((row) => ["under_review", "shortlisted"].includes(row.status)).length;
   const accepts = applicationRows.filter((row) => row.status === "accepted").length;
   const rejects = applicationRows.filter((row) => row.status === "rejected").length;
   const visits = Math.max(0, historyRows.length - applications);
-  const views = 0;
+  const views = Number(viewRows[0]?.count || 0);
   const conversion = applications > 0 ? accepts / applications : 0;
 
   const dayCounts = new Map();

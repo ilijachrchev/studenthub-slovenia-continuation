@@ -21,6 +21,7 @@ const REQUIRED_TABLES = [
   "student_profile",
   "user_interest",
   "bookmark",
+  "opportunity_bookmark",
   "registration",
   "feedback",
 ];

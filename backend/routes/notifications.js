@@ -66,10 +66,12 @@ router.get("/", requireAuth, catchAsync(async (req, res) => {
 
   res.json({
     items: rows,
+    notifications: rows,
     page,
     limit,
     total: countRows[0].total,
     unread_count: unreadRows[0].unread_count,
+    unreadCount: unreadRows[0].unread_count,
   });
 }));
 

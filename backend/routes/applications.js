@@ -48,6 +48,37 @@ async function getOpportunityForApplicant(client, opportunityId, userId) {
   return rows[0];
 }
 
+async function loadHistoryMap(client, applicationIds) {
+  if (!applicationIds.length) {
+    return new Map();
+  }
+
+  const { rows } = await client.query(
+    `SELECT id, application_id, action, from_status, to_status, actor_user_id, created_at
+     FROM application_history
+     WHERE application_id = ANY($1::int[])
+     ORDER BY application_id ASC, created_at ASC, id ASC`,
+    [applicationIds]
+  );
+
+  const historyByApplication = new Map();
+  rows.forEach((row) => {
+    if (!historyByApplication.has(row.application_id)) {
+      historyByApplication.set(row.application_id, []);
+    }
+    historyByApplication.get(row.application_id).push({
+      id: row.id,
+      action: row.action,
+      from_status: row.from_status,
+      to_status: row.to_status,
+      actor_user_id: row.actor_user_id,
+      created_at: toIso(row.created_at),
+    });
+  });
+
+  return historyByApplication;
+}
+
 router.post("/:id/apply", requireAuth, requireRole("student"), catchAsync(async (req, res) => {
   const opportunityId = parseId(req.params.id);
   if (!opportunityId) {
@@ -124,12 +155,16 @@ router.get("/mine", requireAuth, requireRole("student"), catchAsync(async (req, 
     [req.session.user.id]
   );
 
+  const applicationIds = rows.map((row) => row.application_id);
+  const historyMap = await loadHistoryMap(pool, applicationIds);
+
   const items = rows.map((row) => ({
     id: row.application_id,
     status: row.status,
     cover_note: row.cover_note,
     created_at: toIso(row.created_at),
     updated_at: toIso(row.updated_at),
+    history: historyMap.get(row.application_id) || [],
     opportunity: {
       id: row.opportunity_id,
       title: row.opportunity_title,
@@ -143,6 +178,80 @@ router.get("/mine", requireAuth, requireRole("student"), catchAsync(async (req, 
   }));
 
   res.json({ applications: items, items });
+}));
+
+router.delete("/:id/apply", requireAuth, requireRole("student"), catchAsync(async (req, res) => {
+  const opportunityId = parseId(req.params.id);
+  if (!opportunityId) {
+    return res.status(404).json({ error: "Opportunity not found" });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const { rows } = await client.query(
+      `SELECT a.id, a.status, a.opportunity_id, a.applicant_user_id,
+              o.title, o.organization_id
+       FROM application a
+       JOIN opportunity o ON o.id = a.opportunity_id
+       WHERE a.opportunity_id = $1 AND a.applicant_user_id = $2
+       FOR UPDATE`,
+      [opportunityId, req.session.user.id]
+    );
+
+    if (rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    const application = rows[0];
+    const from = normalizeStatus(application.status);
+    const to = "withdrawn";
+
+    try {
+      assertTransition(from, to, "student");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      return res.status(error.status || 400).json({ error: error.message });
+    }
+
+    const { rowCount } = await client.query(
+      "UPDATE application SET status = $1, updated_at = NOW() WHERE id = $2 AND status = $3",
+      [to, application.id, from]
+    );
+
+    if (rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ error: "Application status has changed" });
+    }
+
+    await client.query(
+      `INSERT INTO application_history (application_id, action, from_status, to_status, actor_user_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [application.id, "status_transition", from, to, req.session.user.id]
+    );
+
+    const ownerUserId = await getOpportunityOwner(client, opportunityId);
+    if (ownerUserId) {
+      await emit(ownerUserId, "application.status_changed", {
+        applicationId: application.id,
+        opportunityId,
+        fromStatus: from,
+        toStatus: to,
+        actorUserId: req.session.user.id,
+        actorRole: "student",
+      }, client);
+    }
+
+    await client.query("COMMIT");
+    return res.json({ message: "Application withdrawn", applicationId: application.id, status: to });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }));
 
 router.get("/opportunities/:id/applications", requireAuth, requireRole("organizer"), catchAsync(async (req, res) => {

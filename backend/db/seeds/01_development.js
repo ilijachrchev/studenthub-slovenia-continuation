@@ -37,6 +37,13 @@ exports.seed = async function (knex) {
     "feedback",
   ];
 
+  // Moderation fixtures are optional — older environments may not have run
+  // the 20260817000001 migration yet.
+  const hasModerationTables =
+    (await knex.schema.hasTable("opportunity")) &&
+    (await knex.schema.hasTable("moderator")) &&
+    (await knex.schema.hasTable("moderation_report"));
+
   const missingTables = [];
   for (const table of requiredTables) {
     if (!(await knex.schema.hasTable(table))) {
@@ -158,4 +165,28 @@ exports.seed = async function (knex) {
   await knex("feedback").insert([
     { user_id: 3, event_id: 6, rating: 5, comment: "Great intro to VR, looking forward to more!" },
   ]).onConflict(["user_id", "event_id"]).ignore();
+
+  if (!hasModerationTables) {
+    return;
+  }
+
+  // Moderator account (password: moderator123). Moderator accounts are
+  // never self-registerable — they're provisioned directly, same as admins.
+  await knex("user").insert([
+    { id: 4, first_name: "Moderator", last_name: "User", email: "moderator@studenthub.test", password_hash: "$2b$10$0etb8E5q4eGxlVTJuP9YSe4FXx1mUIGx8IicIYw03b3nxBeRZNcHa", role: "moderator" },
+  ]).onConflict("id").ignore();
+
+  await knex("moderator").insert([{ user_id: 4 }]).onConflict("user_id").ignore();
+
+  // Opportunities (the moderation target type). Owned by the same
+  // organization/owner as the Open Source Club events above.
+  await knex("opportunity").insert([
+    { id: 1, organization_id: 1, title: "Frontend Contributor Wanted", description: "Help us build the club's new website in React.", location: "Remote", status: "published", deadline: "2027-03-01 23:59:00", published_at: knex.fn.now() },
+    { id: 2, organization_id: 3, title: "Suspicious Paid Survey Opportunity", description: "Earn fast cash — just send your bank details first!", location: "Remote", status: "published", deadline: "2027-02-01 23:59:00", published_at: knex.fn.now() },
+  ]).onConflict("id").ignore();
+
+  // A seeded report so a fresh moderation queue isn't empty in local dev.
+  await knex("moderation_report").insert([
+    { id: 1, target_type: "opportunity", target_id: 2, reporter_user_id: 3, category: "scam_or_fraud", severity: "high", reason: "This listing asks for banking details up front, which looks like a phishing attempt.", status: "open" },
+  ]).onConflict("id").ignore();
 };

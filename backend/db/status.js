@@ -8,7 +8,8 @@
 
 const knex = require("knex");
 
-const config = require("../knexfile").development;
+const configName = process.env.NODE_ENV === "test" ? "test" : "development";
+const config = require("../knexfile")[configName];
 
 async function status() {
   const db = knex(config);

@@ -8,7 +8,8 @@
 
 const knex = require("knex");
 
-const config = require("../knexfile").development;
+const configName = process.env.NODE_ENV === "test" ? "test" : "development";
+const config = require("../knexfile")[configName];
 
 if (process.env.NODE_ENV === "production") {
   console.error("Refusing to reset: NODE_ENV is production.");

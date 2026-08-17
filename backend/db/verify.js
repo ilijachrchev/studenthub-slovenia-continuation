@@ -23,6 +23,7 @@ const REQUIRED_TABLES = [
   "bookmark",
   "registration",
   "feedback",
+  "session",
 ];
 
 const REQUIRED_INDEXES = [
@@ -37,7 +38,8 @@ const REQUIRED_INDEXES = [
 ];
 
 async function verify() {
-  const config = require("../knexfile").development;
+  const configName = process.env.NODE_ENV === "test" ? "test" : "development";
+  const config = require("../knexfile")[configName];
   const db = knex(config);
 
   const errors = [];

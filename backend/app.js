@@ -19,10 +19,15 @@ const searchRoutes = require("./routes/search");
 const { validateOrigin } = require("./middleware/csrf");
 const logger = require("./middleware/logger");
 const pinoHttp = require("pino-http");
+const PostgresSessionStore = require("./lib/postgresSessionStore");
 
 const db = require("./db");
 
 const app = express();
+
+if (process.env.NODE_ENV === "production") {
+    app.set("trust proxy", 1);
+}
 
 app.use(helmet({
     contentSecurityPolicy: false,
@@ -45,17 +50,21 @@ if (!sessionSecret) {
     console.warn("WARNING: Using default session secret. Set SESSION_SECRET in .env for production.");
 }
 
+const sessionStore = new PostgresSessionStore(db);
+const sessionCookie = {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.COOKIE_SECURE === "true" || process.env.NODE_ENV === "production",
+    maxAge: 24 * 60 * 60 * 1000,
+};
+
 app.use(
     session({
         secret: sessionSecret || "dev-only-insecure-secret",
         resave: false,
         saveUninitialized: false,
-        cookie: {
-            httpOnly: true,
-            sameSite: "lax",
-            secure: process.env.COOKIE_SECURE === "true" || process.env.NODE_ENV === "production",
-            maxAge: 24 * 60 * 60 * 1000,
-        },
+        store: sessionStore,
+        cookie: sessionCookie,
     })
 );
 

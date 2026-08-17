@@ -16,6 +16,7 @@ pool.query("SELECT 1 AS health")
   })
   .catch((err) => {
     logger.fatal({ err: err.message }, "Database connection failed on startup — server is running but will not serve requests correctly");
+    server.close(() => process.exit(1));
   });
 
 // Graceful shutdown with timeout
@@ -50,6 +51,7 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 // Handle unhandled rejections — log and exit after a short delay
 process.on("unhandledRejection", (reason) => {
   logger.error({ err: reason }, "Unhandled promise rejection");
+  process.exit(1);
 });
 
 process.on("uncaughtException", (err) => {

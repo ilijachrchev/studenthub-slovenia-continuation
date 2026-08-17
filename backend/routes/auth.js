@@ -8,16 +8,58 @@ const logger = require("../middleware/logger");
 
 const router = express.Router();
 
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 20,
+const AUTH_WINDOW_MS = 15 * 60 * 1000;
+const AUTH_MAX_ATTEMPTS = process.env.NODE_ENV === "test" ? 5 : 20;
+
+const loginLimiter = rateLimit({
+    windowMs: AUTH_WINDOW_MS,
+    max: AUTH_MAX_ATTEMPTS,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: "Too many attempts, please try again later" },
+    skipSuccessfulRequests: true,
+    message: { error: "Too many login attempts, please try again later" },
 });
 
+const registerLimiter = rateLimit({
+    windowMs: AUTH_WINDOW_MS,
+    max: AUTH_MAX_ATTEMPTS,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: { error: "Too many registration attempts, please try again later" },
+});
+
+const passwordResetLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: AUTH_MAX_ATTEMPTS,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: { error: "Too many password reset attempts, please try again later" },
+});
+
+const sessionCookieName = "connect.sid";
+const sessionCookieOptions = {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.COOKIE_SECURE === "true" || process.env.NODE_ENV === "production",
+    path: "/",
+};
+
+function destroySession(req, res, message) {
+    req.session.destroy((err) => {
+        if (err) {
+            logger.error({ err }, "Failed to destroy session");
+            return res.status(500).json({ error: "Internal server error" });
+        }
+
+        res.clearCookie(sessionCookieName, sessionCookieOptions);
+        return res.json(message);
+    });
+}
+
 // /api/auth/register POST method
-router.post("/register", authLimiter, catchAsync(async (req, res) => {
+router.post("/register", registerLimiter, catchAsync(async (req, res) => {
     const { first_name, last_name, email, password, role } = req.body;
 
     if (!first_name || !last_name || !email || !password) {
@@ -83,11 +125,11 @@ router.post("/register", authLimiter, catchAsync(async (req, res) => {
         res.status(201).json({ message: "Registration successful" });
     });
 
-    logger.info({ userId: result.id, email, role: userRole }, "User registered");
+    logger.info({ userId: result.id, role: userRole }, "User registered");
 }));
 
 // /api/auth/login POST method
-router.post("/login", authLimiter, catchAsync(async (req, res) => {
+router.post("/login", loginLimiter, catchAsync(async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -99,7 +141,7 @@ router.post("/login", authLimiter, catchAsync(async (req, res) => {
         [email]
     );
     if (users.length === 0) {
-        logger.warn({ email }, "Login failed: unknown email");
+        logger.warn("Login failed: unknown email");
         return res.status(401).json({ error: "Invalid email or password" });
     }
 
@@ -107,7 +149,7 @@ router.post("/login", authLimiter, catchAsync(async (req, res) => {
 
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
-        logger.warn({ userId: user.id, email }, "Login failed: wrong password");
+        logger.warn({ userId: user.id }, "Login failed: wrong password");
         return res.status(401).json({ error: "Invalid email or password" });
     }
 
@@ -128,7 +170,7 @@ router.post("/login", authLimiter, catchAsync(async (req, res) => {
         res.json({ message: "Login successful", user: req.session.user });
     });
 
-    logger.info({ userId: user.id, email }, "User logged in");
+    logger.info({ userId: user.id, role: user.role }, "User logged in");
 }));
 
 // /api/auth/me GET method
@@ -142,15 +184,11 @@ router.get("/me", (req, res) => {
 
 // /api/auth/logout POST method
 router.post("/logout", (req, res) => {
-    const cookieName = req.session.cookie.name || "connect.sid";
-    req.session.destroy(() => {
-        res.clearCookie(cookieName);
-        res.json({ message: "Logged out" });
-    });
+    destroySession(req, res, { message: "Logged out" });
 });
 
 // /api/auth/reset-password POST method
-router.post("/reset-password", authLimiter, catchAsync(async (req, res) => {
+router.post("/reset-password", passwordResetLimiter, catchAsync(async (req, res) => {
     const { email, current_password, new_password } = req.body;
 
     if (!email || !current_password || !new_password) {
@@ -185,11 +223,7 @@ router.post("/reset-password", authLimiter, catchAsync(async (req, res) => {
 
     logger.info({ userId: users[0].id }, "Password updated");
 
-    const cookieName = req.session.cookie.name || "connect.sid";
-    req.session.destroy(() => {
-        res.clearCookie(cookieName);
-        res.json({ message: "Password updated successfully" });
-    });
+    destroySession(req, res, { message: "Password updated successfully" });
 }));
 
 

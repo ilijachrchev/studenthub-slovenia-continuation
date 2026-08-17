@@ -80,6 +80,13 @@ exports.up = async function (knex) {
 };
 
 exports.down = async function (knex) {
+  // Remove newer opportunity-dependent tables first so PostgreSQL can drop the base table
+  // safely even if the rollback order is interrupted or a batch is replayed manually.
+  await knex.schema.dropTableIfExists("opportunity_event");
+  await knex.schema.dropTableIfExists("opportunity_report");
+  await knex.schema.dropTableIfExists("opportunity_bookmark");
+  await knex.schema.dropTableIfExists("opportunity_tag");
+
   await knex.schema.dropTableIfExists("notification");
   await knex.schema.dropTableIfExists("notification_preferences");
   await knex.schema.dropTableIfExists("application_history");

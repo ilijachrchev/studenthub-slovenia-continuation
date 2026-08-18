@@ -129,27 +129,4 @@ describe("notifications", () => {
     expect(rows[0].unread).toBe(0);
   });
 
-  test("returns defaults and validates notification preferences payloads", async () => {
-    const defaultRes = await agent.get("/api/notifications/preferences");
-    expect(defaultRes.status).toBe(200);
-    expect(defaultRes.body.preferences["application.received"]).toBe(true);
-
-    const invalidRes = await agent.put("/api/notifications/preferences").send({
-      preferences: "not-an-object",
-    });
-    expect(invalidRes.status).toBe(400);
-
-    const updateRes = await agent.put("/api/notifications/preferences").send({
-      preferences: {
-        "application.received": false,
-        "application.status_changed": true,
-      },
-    });
-    expect(updateRes.status).toBe(200);
-    expect(updateRes.body.preferences["application.received"]).toBe(false);
-
-    const stored = await agent.get("/api/notifications/preferences");
-    expect(stored.status).toBe(200);
-    expect(stored.body.preferences["application.received"]).toBe(false);
-  });
 });

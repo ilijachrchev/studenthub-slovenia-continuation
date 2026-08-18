@@ -35,6 +35,16 @@ function parseLimit(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 100) : fallback;
 }
 
+function validatePreferencesPayload(req, res, next) {
+  const validation = validateNotificationPreferencesInput(req.body);
+  if (validation.errors.length > 0) {
+    return res.status(400).json({ error: validation.errors[0] });
+  }
+
+  req.validatedPreferences = validation.value;
+  return next();
+}
+
 router.get("/", requireAuth, catchAsync(async (req, res) => {
   const userId = req.session.user.id;
   const page = parsePage(req.query.page, 1);
@@ -123,22 +133,23 @@ router.get("/preferences", requireAuth, catchAsync(async (req, res) => {
   });
 }));
 
-router.put("/preferences", requireAuth, notificationLimiter, catchAsync(async (req, res) => {
-  const validation = validateNotificationPreferencesInput(req.body);
-  if (validation.errors.length > 0) {
-    return res.status(400).json({ error: validation.errors[0] });
-  }
+router.put(
+  "/preferences",
+  requireAuth,
+  validatePreferencesPayload,
+  notificationLimiter,
+  catchAsync(async (req, res) => {
+    const { rows } = await pool.query(
+      `INSERT INTO notification_preferences (user_id, preferences, updated_at)
+       VALUES ($1, $2::jsonb, NOW())
+       ON CONFLICT (user_id)
+       DO UPDATE SET preferences = EXCLUDED.preferences, updated_at = NOW()
+       RETURNING preferences`,
+      [req.session.user.id, JSON.stringify(req.validatedPreferences)]
+    );
 
-  const { rows } = await pool.query(
-    `INSERT INTO notification_preferences (user_id, preferences, updated_at)
-     VALUES ($1, $2::jsonb, NOW())
-     ON CONFLICT (user_id)
-     DO UPDATE SET preferences = EXCLUDED.preferences, updated_at = NOW()
-     RETURNING preferences`,
-    [req.session.user.id, JSON.stringify(validation.value)]
-  );
-
-  res.json({ preferences: rows[0].preferences });
-}));
+    res.json({ preferences: rows[0].preferences });
+  })
+);
 
 module.exports = router;

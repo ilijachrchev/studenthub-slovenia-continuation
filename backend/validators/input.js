@@ -322,18 +322,34 @@ function validateRejectionReasonInput(body) {
 }
 
 function validateNotificationPreferencesInput(body) {
-  const preferences = body && typeof body.preferences === "object" ? body.preferences : body;
-
-  if (!preferences || typeof preferences !== "object" || Array.isArray(preferences)) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
     return {
       errors: ["Preferences must be an object"],
       value: null,
     };
   }
 
+  if (Object.prototype.hasOwnProperty.call(body, "preferences")) {
+    if (
+      !body.preferences ||
+      typeof body.preferences !== "object" ||
+      Array.isArray(body.preferences)
+    ) {
+      return {
+        errors: ["Preferences must be an object"],
+        value: null,
+      };
+    }
+
+    return {
+      errors: [],
+      value: body.preferences,
+    };
+  }
+
   return {
     errors: [],
-    value: preferences,
+    value: body,
   };
 }
 

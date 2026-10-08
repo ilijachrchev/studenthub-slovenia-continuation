@@ -35,6 +35,13 @@ exports.seed = async function (knex) {
     "bookmark",
     "registration",
     "feedback",
+    "opportunity",
+    "application",
+    "application_history",
+    "opportunity_bookmark",
+    "opportunity_report",
+    "opportunity_event",
+    "moderation_audit_log",
   ];
 
   const missingTables = [];
@@ -114,6 +121,46 @@ exports.seed = async function (knex) {
     { id: 6, organization_id: 3, title: "VR Workshop", description: "Hands-on introduction to virtual reality development.", location: "FERI Lab 3, Maribor", start_datetime: "2026-08-01 14:00:00", end_datetime: "2026-08-01 17:00:00", capacity: 20, registration_type: "built_in", external_url: null, status: "published", created_at: knex.fn.now() },
   ]).onConflict("id").ignore();
 
+  // Opportunities
+  await knex("opportunity").insert([
+    {
+      id: 1,
+      organization_id: 1,
+      title: "Frontend Volunteer",
+      description: "Help build the student opportunity hub interface and iterate on discovery flows.",
+      location: "Koper",
+      status: "published",
+      deadline: "2026-10-15 12:00:00",
+      created_at: knex.fn.now(),
+      published_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+    },
+    {
+      id: 2,
+      organization_id: 3,
+      title: "Hackathon Mentor",
+      description: "Support student teams during the annual game and hackathon events.",
+      location: "Maribor",
+      status: "published",
+      deadline: "2026-11-01 12:00:00",
+      created_at: knex.fn.now(),
+      published_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+    },
+    {
+      id: 3,
+      organization_id: 1,
+      title: "Community Outreach Coordinator",
+      description: "Coordinate outreach, collect feedback, and keep volunteers informed.",
+      location: "Remote",
+      status: "draft",
+      deadline: "2026-12-01 12:00:00",
+      created_at: knex.fn.now(),
+      published_at: null,
+      updated_at: knex.fn.now(),
+    },
+  ]).onConflict("id").ignore();
+
   // Event tags
   await knex("event_tag").insert([
     { event_id: 1, tag_id: 1 }, { event_id: 1, tag_id: 5 },
@@ -148,6 +195,64 @@ exports.seed = async function (knex) {
     { user_id: 3, event_id: 1 },
     { user_id: 3, event_id: 3 },
   ]).onConflict(["user_id", "event_id"]).ignore();
+
+  await knex("opportunity_bookmark").insert([
+    { user_id: 3, opportunity_id: 1 },
+    { user_id: 3, opportunity_id: 2 },
+  ]).onConflict(["user_id", "opportunity_id"]).ignore();
+
+  await knex("application").insert([
+    {
+      id: 1,
+      opportunity_id: 1,
+      applicant_user_id: 3,
+      cover_note: "I can help keep the UI sharp and the data flows consistent.",
+      status: "pending",
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+    },
+    {
+      id: 2,
+      opportunity_id: 2,
+      applicant_user_id: 3,
+      cover_note: "I have experience supporting student events.",
+      status: "accepted",
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+    },
+  ]).onConflict(["opportunity_id", "applicant_user_id"]).ignore();
+
+  await knex("application_history").insert([
+    { id: 1, application_id: 1, action: "application_created", from_status: null, to_status: "pending", actor_user_id: 3, created_at: knex.fn.now() },
+    { id: 2, application_id: 2, action: "application_created", from_status: null, to_status: "pending", actor_user_id: 3, created_at: knex.fn.now() },
+    { id: 3, application_id: 2, action: "status_transition", from_status: "pending", to_status: "accepted", actor_user_id: 2, created_at: knex.fn.now() },
+  ]).onConflict("id").ignore();
+
+  await knex("opportunity_event").insert([
+    { id: 1, opportunity_id: 1, user_id: 3, event_type: "opportunity_view", created_at: knex.fn.now() },
+    { id: 2, opportunity_id: 1, user_id: 3, event_type: "opportunity_saved", created_at: knex.fn.now() },
+    { id: 3, opportunity_id: 1, user_id: 3, event_type: "opportunity_applied", created_at: knex.fn.now() },
+    { id: 4, opportunity_id: 2, user_id: 3, event_type: "opportunity_view", created_at: knex.fn.now() },
+  ]).onConflict("id").ignore();
+
+  await knex("opportunity_report").insert([
+    {
+      id: 1,
+      opportunity_id: 2,
+      reporter_user_id: 3,
+      reason: "inaccurate",
+      details: "The location is outdated.",
+      status: "open",
+      resolution_note: null,
+      resolved_by_user_id: null,
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+    },
+  ]).onConflict("id").ignore();
+
+  await knex("moderation_audit_log").insert([
+    { id: 1, actor_user_id: 1, action: "report_created", resource_type: "opportunity_report", resource_id: 1, metadata: { opportunity_id: 2 }, created_at: knex.fn.now() },
+  ]).onConflict("id").ignore();
 
   // Registrations
   await knex("registration").insert([
